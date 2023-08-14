@@ -1,0 +1,9 @@
+[book]
+authors = ["ArielAxionL"]
+language = "zh-CN"
+multilingual = false
+src = "src"
+title = "How Query Engines Work (中文版)"
+
+[output.html]
+cname = "query.arktoria.org"

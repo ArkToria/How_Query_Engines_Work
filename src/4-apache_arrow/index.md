@@ -12,7 +12,7 @@ Apache Arrow 最开始是作为列式数据的内存规范，并以 Java 和 C++
 
 Apache Arrow 现在在许多编程语言中都有实现，包括 C、C++、C#、Go、Java、JavaScript、Julia、MATLAB、Python、R、Ruby 和 Rust。
 
-## Arrow 内存模型
+## Arrow Memory Model 内存模型
 
 在 [Arrow](https://arrow.apache.org/docs/format/Columnar.html) 的网站上详细描述了这一内存模型，但实际上每一个列都是由单个向量表示，其中包含原始数据，以及表示空值的独立向量和可变宽度类型的原始数据偏移量。
 
@@ -32,7 +32,7 @@ Apache Arrow 的范围已经扩展到提供计算库来评估数据表达式。J
 
 Flight 协议由以下方法定义了一个 FlightService:
 
-> 译者建议：在阅读下文之前先对 Google Protobuf 和 gRPC 中的 Service、Client Side 接口和 Stream 有所了解。
+> 译者注：在阅读下文之前先对 Google Protobuf 和 gRPC 中的 Service、Client Side 接口和 Stream 有所了解。
 > 
 > [what is grpc](https://grpc.io/docs/what-is-grpc/introduction/)
  
@@ -76,7 +76,7 @@ Flight 服务会暴露出所有可用的事件类型及其说明。这可以让�
 
 有人提议为 Arrow Flight 添加 SQL 功能。在撰写本报告时 (2021 年 1 月)，有一份 C++ 实现的 PR，跟踪 Issue 是 [ARROW-14698](https://github.com/apache/arrow/pull/12616)。
 
-## 查询引擎
+## Query Engines 查询引擎
 
 ### DataFusion
 

@@ -2,7 +2,7 @@
 authors = ["ArielAxionL"]
 language = "zh-CN"
 multilingual = false
-src = "src"
+src = "docs"
 title = "How Query Engines Work (中文版)"
 
 [output.html]

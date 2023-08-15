@@ -7,3 +7,5 @@ title = "How Query Engines Work (中文版)"
 
 [output.html]
 cname = "query.arktoria.org"
+git-repository-url = "https://github.com/ArkToria/How_Query_Engines_Work"
+edit-url-template = "https://github.com/ArkToria/How_Query_Engines_Work/edit/main/{path}"

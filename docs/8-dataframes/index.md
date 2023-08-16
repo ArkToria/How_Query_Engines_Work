@@ -1,6 +1,6 @@
 # Building Logical Plans 构建逻辑计划
 
-> 本章讨论的源代码可以在 KQuery 项目的 `dataframe` 模块中找到。
+> 本章讨论的源代码可以在 KQuery 项目的 [logical-plan](https://github.com/andygrove/how-query-engines-work/blob/main/jvm/logical-plan) 模块中找到。
 
 ## Building Logical Plans The Hard Way 以复杂方式构建逻辑计划
 

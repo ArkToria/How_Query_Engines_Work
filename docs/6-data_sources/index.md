@@ -1,6 +1,6 @@
 # Data Sources 数据源
 
-> 本章讨论的源代码可以在 KQuery 项目的 `datasource` 模块中找到。
+> 本章讨论的源代码可以在 KQuery 项目的 [datasource](https://github.com/andygrove/how-query-engines-work/tree/main/jvm/datasource) 模块中找到。
 
 如果没有可读取的数据源，查询引擎便无计可施，为此我们希望能够支持多种数据源。因此为查询引擎创建一个可以用来与数据源交互的接口就显得尤为重要。这也允许用户将我们的查询引擎用于他们自定义的数据源。数据源通常是文件或者数据库，当也可以是内存对象。
 
@@ -37,7 +37,7 @@ JavaScript Object Notation 格式 (JSON) 是另一种流行的基于文本的文
 
 Parquet 的创建是为了提供一种压缩、高效的列式数据表示，它是 Hadoop 生态系统中一种流行的文件格式。Parquet 从一开始就考虑到了复杂的嵌套数据结构，并使用了 Dremel 论文中描述的 `record shredding and assembly` 算法。
 
-Parquet 文件包含模式信息，数据按批次存储 (称为 “行组”)，其中每个批次由列组成。行组可以包含压缩数据，也可以包含可选的元数据，例如每列的最大值和最小值。可以对查询引擎进行优化，以使用该元数据来确定在扫描期间可以跳过行组的时机。
+Parquet 文件包含模式信息，数据按 batch 批量存储 (称为 “行组”)，其中每个批量数据由列组成。行组可以包含压缩数据，也可以包含可选的元数据，例如每列的最大值和最小值。可以对查询引擎进行优化，以使用该元数据来确定在扫描期间可以跳过行组的时机。
 
 ### [Optimized Row Columnar (Orc)](https://orc.apache.org/docs/)
 

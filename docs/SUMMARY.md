@@ -17,3 +17,5 @@
 - [逻辑计划和表达式](./7-logical_plans/index.md)
 
 - [数据帧](./8-dataframes/index.md)
+
+- [物理计划和表达式](./9-physical_plans/index.md)

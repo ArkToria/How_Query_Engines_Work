@@ -45,7 +45,7 @@ Projection: #id, #first_name, #last_name, #state, #salary
 
 另一种选择是使用 Avro、Thrift 或 Protocol Buffers 这类与语言无关的序列化格式，然后编写代码实现在这种格式和特定语言之间的转换。
 
-自从本书出版第一版以来，出现了一个名为 ["substrait"](https://substrait.io/) 的新标准，目的是为关系代数提供跨语言序列化。我对这个项目感到非常兴奋，并预测它将因代表了查询计划和开创许多集成可能性而成为事实标准。例如，可以使用基于 Java 的成熟的计划器，如 [Apache Calcite](https://calcite.apache.org/)，以 Substrait 格式序列化计划，然后在较低级别的语言（如 C++ 或 Rust）实现的查询引擎中执行该计划。更多信息请访问 [https://substrait.io/](https://substrait.io/)。
+自从本书出版第一版以来，出现了一个名为 ["substrait"](https://substrait.io/) 的新标准，目的是为关系代数提供跨语言序列化。我对这个项目感到非常兴奋，并预测它将因代表了查询计划和开创许多集成可能性而成为事实标准。例如，可以使用基于 Java 的成熟的规划器，如 [Apache Calcite](https://calcite.apache.org/)，以 Substrait 格式序列化计划，然后在较低级别的语言（如 C++ 或 Rust）实现的查询引擎中执行该计划。更多信息请访问 [https://substrait.io/](https://substrait.io/)。
 
 ## Logical Expressions 逻辑表达式
 

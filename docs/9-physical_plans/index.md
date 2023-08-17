@@ -314,7 +314,7 @@ class ScanExec(val ds: DataSource, val projection: List<String>) : PhysicalPlan 
 }
 ```
 
-## Projection 映射
+### Projection 映射
 
 `Projection` 映射执行计划只需要根据输入的列计算映射表达式，然后生成包含派生列的批量记录。注意，对于按名称引用现有列的映射表达式，派生列只是一个只想输入列的指针或引用，因此不会复制底层数据值。
 
@@ -489,4 +489,53 @@ class HashAggregateExec(
 
 顾名思义，`Join` 运算符用于连接两个相关行。有许多不同类型的连接，伴随着不同的语义。
 
-- `[INNER] JOIN`: 这是最常用的连接类型，它创建了一个包含左右输入行的新关系。
+- `[INNER] JOIN`: 这是最常用的连接类型，它创建了一个包含左右输入行的新关系。如果连接表达式只包含左右输入列之间的等值比较，则这种连接被称为 "equi-join 等值连接"。例如： `SELECT * FROM customer JOIN orders ON customer.id = order.customer_id`。
+- `LEFT [OUTER] JOIN`: 左外连接产生的行包含来自左输入的所有值，以及来自右输入的可选行。若右侧没有匹配的结果，则为右侧列生成空值。
+- `RIGHT [OUTER] JOIN`: 与左连接操作相反。从右边开始的所有行和左边开始的可用行一起返回。
+- `SEMI JOIN`: 半连接类似于左连接，但它只返回左输入中与右输入匹配的行。右输入没有数据返回。并不是所有的 SQL 实现都显式地支持半连接，它们通常被写成子查询语句。例如：`FROM foo WHERE EXISTS (SELECT * FROM bar WHERE foo.id = bar.id)`。
+- `ANTI JOIN`: 反连接与半连接相反。它只返回与右输入匹配的左输入中的行。例如：`SELECT id FROM foo WHERE NOT EXISTS (SELECT * FROM bar WHERE foo.id = bar.id)`。
+- `CROSS JOIN`: 交叉连接返回来自左右输入的所有可能的组合行，如果左输入包含 100 行，右输入包含 200 行，则将返回 20,000 行。这被称为笛卡尔积。
+
+KQuery 还没有实现连接操作符。
+
+### Subqueries 子查询
+
+子查询是查询中的查询。它们可以相关也可以非相关（取决于是否涉及到其它关系的连接）。当子查询返回单个值时，它被称为标量子查询。
+
+### Scalar subqueries 标量子查询
+
+标量子查询返回单个值，可以在许多可以使用字面值的 SQL 表达式中使用。
+
+下面是一个相关标量子查询的示例：
+
+```SQL
+SELECT id, name, (SELECT count(*) FROM orders WHERE customer_id = customer.id) AS num_orders FROM customers;
+```
+
+下面是一个非相关标量子查询的示例：
+
+```SQL
+SELECT * FROM orders WHERE total > (SELECT avg(total) FROM sales WHERE customer_state = 'CA');
+```
+
+相关子查询在执行之前被转换为连接（这将在第九章中解释）。
+
+不相关的查询可以单独执行，结果值可以替换到顶级查询中。
+
+### EXISTS 和 IN 子查询
+
+`EXISTS` 和 `IN` 表达式（以及它们的否定形式 `NOT EXISTS` 和 `NOT IN`）可用于创建半连接和反连接。
+
+如下是一个半连接的示例，它从子查询返回匹配行的左关联 (foo) 中选择所有行。
+
+```SQL
+SELECT id FROM foo WHERE EXISTS (SELECT * FROM bar WHERE foo.id = bar.id);
+```
+
+关联子查询通常在逻辑计划优化期间转换为连接（这将在第九章中解释）。
+
+KQuery 也还没有实现子查询。
+
+## Creating Physical Plans 创建物理计划
+
+物理计划就绪后，下一步是构建一个查询计划其，以便从逻辑计划中创建物理计划，这将在下一章中介绍。

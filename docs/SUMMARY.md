@@ -23,3 +23,7 @@
 - [查询规划器](./10-query_planner/index.md)
 
 - [查询优化](./11-query_optimizations/index.md)
+
+- [查询执行](./12-query_execution/index.md)
+
+- [SQL 支持](./13-sql_support/index.md)

@@ -128,7 +128,25 @@ is Selection -> {
   val filterExpr = createPhysicalExpr(plan.expr, plan.input)
   SelectionExec(input, filterExpr)
 }
-
 ```
 
 ### Aggregate 聚合
+
+聚合查询的查询规划步骤包括计算可选分组键的表达式和聚合函数的输入表达式，然后创建物理聚合表达式。
+
+```kotlin
+is Aggregate -> {
+  val input = createPhysicalPlan(plan.input)
+  val groupExpr = plan.groupExpr.map { createPhysicalExpr(it, plan.input) }
+  val aggregateExpr = plan.aggregateExpr.map {
+    when (it) {
+      is Max -> MaxExpression(createPhysicalExpr(it.expr, plan.input))
+      is Min -> MinExpression(createPhysicalExpr(it.expr, plan.input))
+      is Sum -> SumExpression(createPhysicalExpr(it.expr, plan.input))
+      else -> throw java.lang.IllegalStateException(
+          "Unsupported aggregate function: $it")
+    }
+  }
+  HashAggregateExec(input, groupExpr, aggregateExpr, plan.schema())
+}
+```

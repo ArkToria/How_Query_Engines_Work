@@ -19,3 +19,7 @@
 - [数据帧](./8-dataframes/index.md)
 
 - [物理计划和表达式](./9-physical_plans/index.md)
+
+- [查询规划器](./10-query_planner/index.md)
+
+- [查询优化](./11-query_optimizations/index.md)

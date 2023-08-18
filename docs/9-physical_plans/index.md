@@ -1,7 +1,7 @@
 # Physical Plan & Expressions 物理计划和表达式
 
 > 本章讨论的源代码可以在 KQuery 项目的 [physical-plan](https://github.com/andygrove/how-query-engines-work/tree/main/jvm/physical-plan) 模块中找到。
-
+>
 > 译者注：此处未找到适合 `Physical` 的表意词，大意指软件逻辑和硬件调度优化设计进行分离。
 
 在第五章中定义的逻辑计划指定了该怎么实现，但是没有阐述如何实现。并且尽管将逻辑和物理计划结合起来可以降低开发复杂度，但将二者分开仍就是一个很好的实践。
@@ -518,7 +518,7 @@ SELECT id, name, (SELECT count(*) FROM orders WHERE customer_id = customer.id) A
 SELECT * FROM orders WHERE total > (SELECT avg(total) FROM sales WHERE customer_state = 'CA');
 ```
 
-相关子查询在执行之前被转换为连接（这将在第九章中解释）。
+相关子查询在执行之前被转换为连接（这将在第 10 章中解释）。
 
 不相关的查询可以单独执行，结果值可以替换到顶级查询中。
 
@@ -532,7 +532,7 @@ SELECT * FROM orders WHERE total > (SELECT avg(total) FROM sales WHERE customer_
 SELECT id FROM foo WHERE EXISTS (SELECT * FROM bar WHERE foo.id = bar.id);
 ```
 
-关联子查询通常在逻辑计划优化期间转换为连接（这将在第九章中解释）。
+关联子查询通常在逻辑计划优化期间转换为连接（这将在第 10 章中解释）。
 
 KQuery 也还没有实现子查询。
 

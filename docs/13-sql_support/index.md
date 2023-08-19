@@ -2,7 +2,7 @@
 
 > 本章讨论的源代码可以在 KQuery 的 [examples](https://github.com/andygrove/how-query-engines-work/tree/main/jvm/examples) 模块中找到。
 
-除了具有手动编码逻辑计划的能力外，在某些情况下，仅编写 SQL 将更加方便。在本章节中，我们将构建一个可以将 SQL 查询转化为逻辑计划的 SQL 解析器和查询计划器。
+除了具有手动编码逻辑计划的能力外，在某些情况下，仅编写 SQL 将更加方便。在本章节中，我们将构建一个可以将 SQL 查询转化为逻辑计划的 SQL 解析器和查询规划器。
 
 ## Tokenizer 分词器
 
@@ -229,3 +229,163 @@ SELECT id, first_name, last_name, salary/12 AS monthly_salary
 FROM employee
 WHERE state = 'CO' AND monthly_salary > 1000
 ```
+
+虽然这对于阅读的人来说很直观，但是查询的选择部分 (`WHERE` 子句) 引用了一个表达式 (`state`)，该表达式不包含在映射的输出中，因此显然需要在映射前应用，当它同时也应用了另一个表达式 (`salary/12 AS monthly_salary`)，该表达式只有在应用映射后才可用。在使用 `GROUP BY`、`HAVING` 和 `ORDER BY` 子句时，我们也会遇到类似的问题。
+
+这个问题有多种解决方案。一种方案是将此查询转换未以下逻辑计划，将表达式分成两个步骤，一个在映射前，另一个在映射后。但是，这样可行仅仅是因为所选的表达式是一个结合性谓词（只有在所有部分都是正确的情况下，表达式是正确的），而对于更复杂的表达式来说，这种方法可能无法使用。如果该表达式变为 `state = 'CO' OR monthly_salary > 1000`，那么我们将无法执行此操作。
+
+```SQL
+Filter: #monthly_salary > 1000
+  Projection: #id, #first_name, #last_name, #salary/12 AS monthly_salary
+    Filter: #state = 'CO'
+      Scan: table=employee
+```
+
+一种更加简单通用的方法是将所有必须的表达式加到映射中，以便可以在映射后应用选择，然后通过在另一个映射中封装输出来移除所有多余的列。
+
+```kotlin
+Projection: #id, #first_name, #last_name, #monthly_salary
+  Filter: #state = 'CO' AND #monthly_salary > 1000
+    Projection: #id, #first_name, #last_name, #salary/12 AS monthly_salary, #state
+      Scan: table=employee
+```
+
+值得注意的是，我们将在后面的章节中构建一个 "Predicate Push Down" 查询优化器规则，它能够优化该计划，并将谓词的 `state = 'CO'` 部分推到计划的更下方，使其位于映射之前。
+
+## Translating SQL Expressions 转换 SQL 表达式
+
+将 SQL 表达式转换未逻辑表达式相当简单，如本示例代码所示：
+
+```kotlin
+private fun createLogicalExpr(expr: SqlExpr, input: DataFrame) : LogicalExpr {
+  return when (expr) {
+    is SqlIdentifier -> Column(expr.id)
+    is SqlAlias -> Alias(createLogicalExpr(expr.expr, input), expr.alias.id)
+    is SqlString -> LiteralString(expr.value)
+    is SqlLong -> LiteralLong(expr.value)
+    is SqlDouble -> LiteralDouble(expr.value)
+    is SqlBinaryExpr -> {
+      val l = createLogicalExpr(expr.l, input)
+      val r = createLogicalExpr(expr.r, input)
+      when(expr.op) {
+        // comparison operators
+        "=" -> Eq(l, r)
+        "!=" -> Neq(l, r)
+        ">" -> Gt(l, r)
+        ">=" -> GtEq(l, r)
+        "<" -> Lt(l, r)
+        "<=" -> LtEq(l, r)
+        // boolean operators
+        "AND" -> And(l, r)
+        "OR" -> Or(l, r)
+        // math operators
+        "+" -> Add(l, r)
+        "-" -> Subtract(l, r)
+        "*" -> Multiply(l, r)
+        "/" -> Divide(l, r)
+        "%" -> Modulus(l, r)
+        else -> throw SQLException("Invalid operator ${expr.op}")
+      }
+    }
+
+    else -> throw new UnsupportedOperationException()
+  }
+}
+```
+
+## Planning SELECT 规划 SELECT
+
+如果我们只想支持所选列引用也全都存在于映射中，我们也可以使用一些非常简单的逻辑来构建查询计划。
+
+```kotlin
+fun createDataFrame(select: SqlSelect, tables: Map<String, DataFrame>) : DataFrame {
+
+  // get a reference to the data source
+  var df = tables[select.tableName] ?:
+      throw SQLException("No table named '${select.tableName}'")
+
+  val projectionExpr = select.projection.map { createLogicalExpr(it, df) }
+
+  if (select.selection == null) {
+    // apply projection
+    return df.select(projectionExpr)
+  }
+
+  // apply projection then wrap in a selection (filter)
+  return df.select(projectionExpr)
+           .filter(createLogicalExpr(select.selection, df))
+}
+```
+
+然而，由于选择可以映射的输入和输出，因此我们需要创建一个带有中间映射的更复杂的计划。第一步是通过选择过滤器表达式以确定哪些列是被引用到的。为此，我们将使用访问者模式遍历表达式树，并构建一个可变的列名称集合。
+
+下面是我们将用于遍历表达式树的方法：
+
+```kotlin
+private fun visit(expr: LogicalExpr, accumulator: MutableSet<String>) {
+  when (expr) {
+    is Column -> accumulator.add(expr.name)
+    is Alias -> visit(expr.expr, accumulator)
+    is BinaryExpr -> {
+      visit(expr.l, accumulator)
+      visit(expr.r, accumulator)
+     }
+  }
+}
+```
+
+至此，我们现在可以编写以下代码，将 SELECT 语句转换为有效的逻辑计划。下面的示例代码并不完美，并且在特殊情况下下可能包含一些错误，例如数据源中的列和别名表达式之间存在名称冲突，但是为了保持代码简洁，我们将暂时忽略这一点。
+
+```kotlin
+fun createDataFrame(select: SqlSelect, tables: Map<String, DataFrame>) : DataFrame {
+
+  // get a reference to the data source
+  var df = tables[select.tableName] ?:
+    throw SQLException("No table named '${select.tableName}'")
+
+  // create the logical expressions for the projection
+  val projectionExpr = select.projection.map { createLogicalExpr(it, df) }
+
+  if (select.selection == null) {
+    // if there is no selection then we can just return the projection
+    return df.select(projectionExpr)
+  }
+
+  // create the logical expression to represent the selection
+  val filterExpr = createLogicalExpr(select.selection, df)
+
+  // get a list of columns references in the projection expression
+  val columnsInProjection = projectionExpr
+    .map { it.toField(df.logicalPlan()).name}
+    .toSet()
+
+  // get a list of columns referenced in the selection expression
+  val columnNames = mutableSetOf<String>()
+  visit(filterExpr, columnNames)
+
+  // determine if the selection references any columns not in the projection
+  val missing = columnNames - columnsInProjection
+
+  // if the selection only references outputs from the projection we can
+  // simply apply the filter expression to the DataFrame representing
+  // the projection
+  if (missing.size == 0) {
+    return df.select(projectionExpr)
+             .filter(filterExpr)
+  }
+
+  // because the selection references some columns that are not in the
+  // projection output we need to create an interim projection that has
+  // the additional columns and then we need to remove them after the
+  // selection has been applied
+  return df.select(projectionExpr + missing.map { Column(it) })
+           .filter(filterExpr)
+           .select(projectionExpr.map {
+              Column(it.toField(df.logicalPlan()).name)
+            })
+}
+```
+
+## Planning for Aggregate Queries 规划聚合查询
+
+如你所见，SQL 查询规划器相对复杂，解析聚合查询的代码则更有甚之。如果你对此有兴趣了解更多，请参阅源代码。

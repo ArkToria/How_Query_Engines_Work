@@ -27,3 +27,5 @@
 - [查询执行](./12-query_execution/index.md)
 
 - [SQL 支持](./13-sql_support/index.md)
+
+- [并行查询执行](./14-parallel_query_execution/index.md)

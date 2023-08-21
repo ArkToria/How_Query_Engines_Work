@@ -1,0 +1,362 @@
+<!DOCTYPE HTML>
+<html lang="zh-CN" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>查询优化 - How Query Engines Work (中文版)</title>
+
+
+        <!-- Custom HTML head -->
+        
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+    </head>
+    <body>
+    <div id="body-container">
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var html = document.querySelector('html');
+            var sidebar = null;
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="../index.html">译者言</a></li><li class="chapter-item expanded "><a href="../1-acknowledgments/index.html"><strong aria-hidden="true">1.</strong> 致谢</a></li><li class="chapter-item expanded "><a href="../2-introduction/index.html"><strong aria-hidden="true">2.</strong> 介绍</a></li><li class="chapter-item expanded "><a href="../3-what_is_a_query_engine/index.html"><strong aria-hidden="true">3.</strong> 什么是查询引擎</a></li><li class="chapter-item expanded "><a href="../4-apache_arrow/index.html"><strong aria-hidden="true">4.</strong> Apache Arrow</a></li><li class="chapter-item expanded "><a href="../5-type_system/index.html"><strong aria-hidden="true">5.</strong> 类型系统</a></li><li class="chapter-item expanded "><a href="../6-data_sources/index.html"><strong aria-hidden="true">6.</strong> 数据源</a></li><li class="chapter-item expanded "><a href="../7-logical_plans/index.html"><strong aria-hidden="true">7.</strong> 逻辑计划和表达式</a></li><li class="chapter-item expanded "><a href="../8-dataframes/index.html"><strong aria-hidden="true">8.</strong> 数据帧</a></li><li class="chapter-item expanded "><a href="../9-physical_plans/index.html"><strong aria-hidden="true">9.</strong> 物理计划和表达式</a></li><li class="chapter-item expanded "><a href="../10-query_planner/index.html"><strong aria-hidden="true">10.</strong> 查询规划器</a></li><li class="chapter-item expanded "><a href="../11-query_optimizations/index.html" class="active"><strong aria-hidden="true">11.</strong> 查询优化</a></li><li class="chapter-item expanded "><a href="../12-query_execution/index.html"><strong aria-hidden="true">12.</strong> 查询执行</a></li><li class="chapter-item expanded "><a href="../13-sql_support/index.html"><strong aria-hidden="true">13.</strong> SQL 支持</a></li><li class="chapter-item expanded "><a href="../14-parallel_query_execution/index.html"><strong aria-hidden="true">14.</strong> 并行查询执行</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <!-- Track and set sidebar scroll position -->
+        <script>
+            var sidebarScrollbox = document.querySelector('#sidebar .sidebar-scrollbox');
+            sidebarScrollbox.addEventListener('click', function(e) {
+                if (e.target.tagName === 'A') {
+                    sessionStorage.setItem('sidebar-scroll', sidebarScrollbox.scrollTop);
+                }
+            }, { passive: true });
+            var sidebarScrollTop = sessionStorage.getItem('sidebar-scroll');
+            sessionStorage.removeItem('sidebar-scroll');
+            if (sidebarScrollTop) {
+                // preserve sidebar scroll position when navigating via links within sidebar
+                sidebarScrollbox.scrollTop = sidebarScrollTop;
+            } else {
+                // scroll sidebar to current active section when navigating via "next/previous chapter" buttons
+                var activeSection = document.querySelector('#sidebar .active');
+                if (activeSection) {
+                    activeSection.scrollIntoView({ block: 'center' });
+                }
+            }
+        </script>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">How Query Engines Work (中文版)</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/ArkToria/How_Query_Engines_Work" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/ArkToria/How_Query_Engines_Work/edit/main/docs/11-query_optimizations/index.md" title="Suggest an edit" aria-label="Suggest an edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="query-optimizations-请求优化器"><a class="header" href="#query-optimizations-请求优化器">Query Optimizations 请求优化器</a></h1>
+<blockquote>
+<p>本章讨论的源代码可以在 KQuery 项目的 <a href="https://github.com/andygrove/how-query-engines-work/tree/main/jvm/optimizer">optimizer</a> 模块中找到。</p>
+</blockquote>
+<p>我们现在有了功能性查询计划，但是我们有赖于终端用户能够以一种有效的方式构造计划。例如，我们希望用户在构建计划的时候能够尽早的使用过滤器，特别是在连接操作之前，因为这样可以限制需要处理的数据量。</p>
+<p>是时候来实现一个简单的基于规则的优化器了，它可以重新安排查询计划以提高其效率。</p>
+<p>一旦我们在第 11 章中开始支持 SQL，这将变得更加重要，因为 SQL 语言只定义查询应该如何工作，并不总是允许用户去指定运算符和表达式的求值顺序。</p>
+<h2 id="rule-based-optimizations-基于规则的优化器"><a class="header" href="#rule-based-optimizations-基于规则的优化器">Rule-Based Optimizations 基于规则的优化器</a></h2>
+<p>基于规则进行优化是一种简单而实用的方法。尽管基于规则的优化器也可以应用于物理计划，但是这些优化器通常在创建物理计划之前针对逻辑计划执行。</p>
+<p>优化器的工作方式是使用访问者模式遍历逻辑计划，创建计划中每个步骤的副本并应用必要的修改。这事一种比在执行计划时视图改变状态要简单得多的涉及，并且倾向于不可变状态的函数式编程风格。</p>
+<p>我们将会使用下面这些接口来表示优化器规则。</p>
+<pre><code class="language-kotlin">interface OptimizerRule {
+  fun optimize(plan: LogicalPlan) : LogicalPlan
+}
+</code></pre>
+<p>现在，我们将研究大多数查询引擎实施的一些常见的优化规则。</p>
+<h3 id="projection-push-down-映射下推"><a class="header" href="#projection-push-down-映射下推">Projection Push-Down 映射下推</a></h3>
+<blockquote>
+<p>译者注：如根据表达式自动提前构建所需的映射关联表。</p>
+</blockquote>
+<p>映射下推的目标是在从磁盘读取数据之后和其它查询阶段之前尽快过滤掉列数据，以减少各操作之间保存在内存中的数据量（并且在分布式查询的情况下可能通过网络传输）。</p>
+<p>为了知道查询中引用了哪些列，我们必须编写递归代码以检查表达式并构建列数据列表。</p>
+<pre><code class="language-kotlin">fun extractColumns(expr: List&lt;LogicalExpr&gt;,
+                   input: LogicalPlan,
+                   accum: MutableSet&lt;String&gt;) {
+
+  expr.forEach { extractColumns(it, input, accum) }
+}
+
+fun extractColumns(expr: LogicalExpr,
+                   input: LogicalPlan,
+                   accum: MutableSet&lt;String&gt;) {
+
+  when (expr) {
+    is ColumnIndex -&gt; accum.add(input.schema().fields[expr.i].name)
+    is Column -&gt; accum.add(expr.name)
+    is BinaryExpr -&gt; {
+       extractColumns(expr.l, input, accum)
+       extractColumns(expr.r, input, accum)
+    }
+    is Alias -&gt; extractColumns(expr.expr, input, accum)
+    is CastExpr -&gt; extractColumns(expr.expr, input, accum)
+    is LiteralString -&gt; {}
+    is LiteralLong -&gt; {}
+    is LiteralDouble -&gt; {}
+    else -&gt; throw IllegalStateException(
+        &quot;extractColumns does not support expression: $expr&quot;)
+  }
+}
+</code></pre>
+<p>有了这段实用的代码，我们就可以继续优化器规则了。注意，对于 <code>Projection</code> 映射、<code>Selection</code> 选择和 <code>Aggregate</code> 聚合计划，我们正在构建列名称列表，但是当我们遇到 <code>Scan</code> 扫描（它是一个叶节点）的时候，我们将其替换为查询的列名称列表中的版本。</p>
+<pre><code class="language-kotlin">class ProjectionPushDownRule : OptimizerRule {
+  override fun optimize(plan: LogicalPlan): LogicalPlan {
+    return pushDown(plan, mutableSetOf())
+  }
+
+  private fun pushDown(plan: LogicalPlan,
+                       columnNames: MutableSet&lt;String&gt;): LogicalPlan {
+    return when (plan) {
+      is Projection -&gt; {
+        extractColumns(plan.expr, columnNames)
+        val input = pushDown(plan.input, columnNames)
+        Projection(input, plan.expr)
+      }
+      is Selection -&gt; {
+        extractColumns(plan.expr, columnNames)
+        val input = pushDown(plan.input, columnNames)
+        Selection(input, plan.expr)
+      }
+      is Aggregate -&gt; {
+        extractColumns(plan.groupExpr, columnNames)
+        extractColumns(plan.aggregateExpr.map { it.inputExpr() }, columnNames)
+        val input = pushDown(plan.input, columnNames)
+        Aggregate(input, plan.groupExpr, plan.aggregateExpr)
+      }
+      is Scan -&gt; Scan(plan.name, plan.dataSource, columnNames.toList().sorted())
+      else -&gt; throw new UnsupportedOperationException()
+    }
+  }
+}
+</code></pre>
+<p>给定的输入逻辑计划为：</p>
+<pre><code class="language-SQL">Projection: #id, #first_name, #last_name
+  Filter: #state = 'CO'
+    Scan: employee; projection=None
+</code></pre>
+<p>此优化器规则将其转换为如下计划：</p>
+<pre><code class="language-SQL">Projection: #id, #first_name, #last_name
+  Filter: #state = 'CO'
+    Scan: employee; projection=[first_name, id, last_name, state]
+</code></pre>
+<h3 id="predicate-push-down-谓词下推"><a class="header" href="#predicate-push-down-谓词下推">Predicate Push-Down 谓词下推</a></h3>
+<p>谓词下推优化的目的是为了在查询中尽早地过滤掉行，以避免冗余处理。考虑下面的例子，它连接一个 employee 表和 dept 表，然后过滤位于 Colorado 的员工。</p>
+<pre><code class="language-SQL">Projection: #dept_name, #first_name, #last_name
+  Filter: #state = 'CO'
+    Join: #employee.dept_id = #dept.id
+      Scan: employee; projection=[first_name, id, last_name, state]
+      Scan: dept; projection=[id, dept_name]
+</code></pre>
+<p>这样查询虽然能够产生正确的结果，但也因为对所有员工数据进行连接导致冗余的开销，而不仅是那些位于 Colorado 的员工。谓词下推规则将把过滤器下推到连接中，如下面的查询计划所示。</p>
+<pre><code class="language-SQL">Projection: #dept_name, #first_name, #last_name
+  Join: #employee.dept_id = #dept.id
+    Filter: #state = 'CO'
+      Scan: employee; projection=[first_name, id, last_name, state]
+    Scan: dept; projection=[id, dept_name]
+</code></pre>
+<p>连接现在将只处理员工信息的一个子集，从而达到更好的性能。</p>
+<h3 id="eliminate-common-subexpressions-消除公共子表达式"><a class="header" href="#eliminate-common-subexpressions-消除公共子表达式">Eliminate Common Subexpressions 消除公共子表达式</a></h3>
+<p>给定一个查询，例如 <code>SELECT sum(price * qty) as total_price, sum(price * qty * tax_rate) as total_tax FROM ...</code> 我们可以看到表达式 <code>price * qty</code> 出现了两次。我们可以选择重写计划来仅计算一次，而不是执行两次计算。</p>
+<p>原计划：</p>
+<pre><code class="language-SQL">Projection: sum(#price * #qty), sum(#price * #qty * #tax)
+  Scan: sales
+</code></pre>
+<p>优化后：</p>
+<pre><code class="language-SQL">Projection: sum(#_price_mult_qty), sum(#_price_mult_qty * #tax)
+  Projection: #price * #qty as _price_mult_qty
+    Scan: sales
+</code></pre>
+<h3 id="将相关子查询转换为连接"><a class="header" href="#将相关子查询转换为连接">将相关子查询转换为连接</a></h3>
+<p>给定一个查询，例如 <code>SELECT id FROM foo WHERE EXISTS (SELECT * FROM bar WHERE foo.id = bar.id)</code>。一个简单的实现是扫描 <code>foo</code> 中的所有行，然后对 <code>foo</code> 中的每一行在 <code>bar</code> 中执行查找。这样非常低效，因此查询引擎通常将相关子查询转换为连接。这也称为子查询去相关。</p>
+<p>上述请求可以重写为 <code>SELECT foo.id FROM foo JOIN bar ON foo.id = bar.id</code>。</p>
+<pre><code class="language-SQL">Projection: foo.id
+  LeftSemi Join: foo.id = bar.id
+    TableScan: foo projection=[id]
+    TableScan: bar projection=[id]
+</code></pre>
+<p>如果将查询修改为使用 <code>NOT EXISTS</code> 而不是 <code>EXISTS</code>，那么查询计划将使用 <code>LeftAnti</code> 而不是 <code>LeftSemi</code> 进行连接。</p>
+<pre><code class="language-SQL">Projection: foo.id
+  LeftAnti Join: foo.id = bar.id
+    TableScan: foo projection=[id]
+    TableScan: bar projection=[id]
+</code></pre>
+<h3 id="cost-based-optimizations"><a class="header" href="#cost-based-optimizations">Cost-Based Optimizations</a></h3>
+<p>基于开销的优化是指使用有关基础数据的统计信息来确定执行特定查询的开销，然后通过寻找开销较小的计划来确定最优的执行计划的优化规则。一个很好的实现会根据基础数据表的大小选择要使用的连接算法，或者选择连接表的顺序。</p>
+<p>基于开销优化的一个主要缺点是，它们依赖于有关基础数据库的准确性和详细统计信息的可用性。此类统计信息通常包括每列统计信息，例如空值的数量、不同值的数量、最小值和最大值，以及显示列内值分布的直方图。直方图对于能够检测到像 <code>state = 'CA'</code> 这样的谓词可能比 <code>state = 'WY'</code> 产生更多的数据行（California 加利福尼亚州是美国人口最多的州，有 3900 万居民，而 Wyoming 怀俄明州是人口最少的州，居民不到 100 万）。</p>
+<p>当使用诸如 Orc 或 Parquet 这类的文件格式时，可以使用其中一些统计信息，但是通常有必要运行一个进程来构建这些统计信息，并且当数据量达到 TB 级，这种做法弊大于利，特别是对于 <code>ad-hoc</code> （临时的、特别的）查询。</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../10-query_planner/index.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next" href="../12-query_execution/index.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../10-query_planner/index.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next" href="../12-query_execution/index.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>

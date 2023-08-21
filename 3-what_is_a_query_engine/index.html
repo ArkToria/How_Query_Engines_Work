@@ -1,0 +1,282 @@
+<!DOCTYPE HTML>
+<html lang="zh-CN" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>什么是查询引擎 - How Query Engines Work (中文版)</title>
+
+
+        <!-- Custom HTML head -->
+        
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+    </head>
+    <body>
+    <div id="body-container">
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var html = document.querySelector('html');
+            var sidebar = null;
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="../index.html">译者言</a></li><li class="chapter-item expanded "><a href="../1-acknowledgments/index.html"><strong aria-hidden="true">1.</strong> 致谢</a></li><li class="chapter-item expanded "><a href="../2-introduction/index.html"><strong aria-hidden="true">2.</strong> 介绍</a></li><li class="chapter-item expanded "><a href="../3-what_is_a_query_engine/index.html" class="active"><strong aria-hidden="true">3.</strong> 什么是查询引擎</a></li><li class="chapter-item expanded "><a href="../4-apache_arrow/index.html"><strong aria-hidden="true">4.</strong> Apache Arrow</a></li><li class="chapter-item expanded "><a href="../5-type_system/index.html"><strong aria-hidden="true">5.</strong> 类型系统</a></li><li class="chapter-item expanded "><a href="../6-data_sources/index.html"><strong aria-hidden="true">6.</strong> 数据源</a></li><li class="chapter-item expanded "><a href="../7-logical_plans/index.html"><strong aria-hidden="true">7.</strong> 逻辑计划和表达式</a></li><li class="chapter-item expanded "><a href="../8-dataframes/index.html"><strong aria-hidden="true">8.</strong> 数据帧</a></li><li class="chapter-item expanded "><a href="../9-physical_plans/index.html"><strong aria-hidden="true">9.</strong> 物理计划和表达式</a></li><li class="chapter-item expanded "><a href="../10-query_planner/index.html"><strong aria-hidden="true">10.</strong> 查询规划器</a></li><li class="chapter-item expanded "><a href="../11-query_optimizations/index.html"><strong aria-hidden="true">11.</strong> 查询优化</a></li><li class="chapter-item expanded "><a href="../12-query_execution/index.html"><strong aria-hidden="true">12.</strong> 查询执行</a></li><li class="chapter-item expanded "><a href="../13-sql_support/index.html"><strong aria-hidden="true">13.</strong> SQL 支持</a></li><li class="chapter-item expanded "><a href="../14-parallel_query_execution/index.html"><strong aria-hidden="true">14.</strong> 并行查询执行</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <!-- Track and set sidebar scroll position -->
+        <script>
+            var sidebarScrollbox = document.querySelector('#sidebar .sidebar-scrollbox');
+            sidebarScrollbox.addEventListener('click', function(e) {
+                if (e.target.tagName === 'A') {
+                    sessionStorage.setItem('sidebar-scroll', sidebarScrollbox.scrollTop);
+                }
+            }, { passive: true });
+            var sidebarScrollTop = sessionStorage.getItem('sidebar-scroll');
+            sessionStorage.removeItem('sidebar-scroll');
+            if (sidebarScrollTop) {
+                // preserve sidebar scroll position when navigating via links within sidebar
+                sidebarScrollbox.scrollTop = sidebarScrollTop;
+            } else {
+                // scroll sidebar to current active section when navigating via "next/previous chapter" buttons
+                var activeSection = document.querySelector('#sidebar .active');
+                if (activeSection) {
+                    activeSection.scrollIntoView({ block: 'center' });
+                }
+            }
+        </script>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">How Query Engines Work (中文版)</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/ArkToria/How_Query_Engines_Work" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/ArkToria/How_Query_Engines_Work/edit/main/docs/3-what_is_a_query_engine/index.md" title="Suggest an edit" aria-label="Suggest an edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="what-is-a-query-engine-什么是查询引擎"><a class="header" href="#what-is-a-query-engine-什么是查询引擎">What Is a Query Engine? 什么是查询引擎？</a></h1>
+<p>查询引擎是一种软件，它可以对数据进行查询，以产生问题的答案，例如：</p>
+<ul>
+<li>今年到目前为止，我每月的平均销售额是多少？</li>
+<li>在过去的一天里，我的网站上最受欢迎的五个网页是什么？</li>
+<li>与一年前相比，网络流量的月度情况如何？</li>
+</ul>
+<p>最广泛使用的查询语言是结构化查询语言 (简称 SQL)。许多开发人员在他们的职业生涯中都会遇到关系型数据库，如 MySQL、Postgres、Oracle 或 SQL Server。所有这些数据库都包含支持 SQL 的查询引擎。</p>
+<p>这里有一些 SQL 请求示例：</p>
+<blockquote>
+<p>SQL 示例：月平均销售额</p>
+</blockquote>
+<pre><code class="language-sql">SELECT month, AVG(sales)
+FROM product_sales
+WHERE year = 2020
+GROUP BY month;
+</code></pre>
+<blockquote>
+<p>SQL 示例：昨天最热门的五个网页</p>
+</blockquote>
+<pre><code class="language-sql">SELECT page_url, COUNT(*) AS num_visits
+FROM apache_log
+WHERE event_date = yesterday()
+GROUP BY page_url
+ORDER BY num_visits DESC
+LIMIT 5;
+</code></pre>
+<p>SQL 功能强大且广为人知，但在所谓的 “大数据” 世界中存在局限性，数据科学家通常需要将自定义代码和查询混合在一起。Apache Hadoop、Apache Hive 和 Apache Spark 等平台和工具现在被广泛用于查询和操作大量数据。</p>
+<blockquote>
+<p>Apache Spark 使用 DataFrame 查询示例：</p>
+</blockquote>
+<pre><code class="language-kotlin">val spark: SparkSession = SparkSession.builder
+  .appName(&quot;Example&quot;)
+  .master(&quot;local[*]&quot;)
+  .getOrCreate()
+
+val df = spark.read.parquet(&quot;/mnt/nyctaxi/parquet&quot;)
+  .groupBy(&quot;passenger_count&quot;)
+  .sum(&quot;fare_amount&quot;)
+  .orderBy(&quot;passenger_count&quot;)
+
+df.show()
+</code></pre>
+<h2 id="why-are-query-engines-popular-为什么查询引擎广受欢迎"><a class="header" href="#why-are-query-engines-popular-为什么查询引擎广受欢迎">Why Are Query Engines Popular? 为什么查询引擎广受欢迎？</a></h2>
+<p>数据增长的加速度越来越大，通常无法在一台计算机上容纳。需要专业的工程师来编写分布式代码以查询数据，并且每次需要从数据中获取新答案时都编写自定义代码是不切实际的。查询引擎提供了一组标准操作和转换方式，因此终端用户可以通过以不同方式将简单的查询语言或应用程序编程接口 (API) 进行组合和转换，并进行调优以获得良好的性能。</p>
+<h2 id="what-this-book-covers-本书涵盖了什么内容"><a class="header" href="#what-this-book-covers-本书涵盖了什么内容">What This Book Covers 本书涵盖了什么内容</a></h2>
+<p>本书概述了构建通用查询引擎所涉及的每个步骤。本书中讨论的查询引擎是专门为本书开发的一个简单的查询疫情，其代码是在编写本书内容的同时开发的，以确保我在面临涉及决策时可以编写有关的主题内容。</p>
+<h2 id="source-code-源代码"><a class="header" href="#source-code-源代码">Source Code 源代码</a></h2>
+<p>本书所讨论的完整的查询引擎代码在 Github 仓库：</p>
+<blockquote>
+<p>https://github.com/andygrove/how-query-engines-work</p>
+</blockquote>
+<p>有关使用 Gradle 构建项目的最新说明请参阅项目中的 README 文档。</p>
+<h2 id="why-kotlin-为什么使用-kotlin"><a class="header" href="#why-kotlin-为什么使用-kotlin">Why Kotlin? 为什么使用 Kotlin?</a></h2>
+<p>本书的重点是查询引擎设计，这通常是编程语言不可或缺的。我在本书中之所以选择 Kotlin，是因为它简洁易懂。并且它也与 Java 100% 兼容，这意味着您可以从 Java 或者其它基于 Java 的语言 (比如 Scala) 调用 Kotlin 代码。</p>
+<p>尽管如此，Apache Arrow 项目中的 DataFusion 查询引擎也主要是基于本书中的设计。对 Rust 比 JVM 更感兴趣的读者可以参考 DataFusion 源代码和本书。</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../2-introduction/index.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next" href="../4-apache_arrow/index.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../2-introduction/index.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next" href="../4-apache_arrow/index.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>

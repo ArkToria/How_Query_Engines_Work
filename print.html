@@ -1,0 +1,2054 @@
+<!DOCTYPE HTML>
+<html lang="zh-CN" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>How Query Engines Work (中文版)</title>
+        <meta name="robots" content="noindex" />
+
+
+        <!-- Custom HTML head -->
+        
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+    </head>
+    <body>
+    <div id="body-container">
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var html = document.querySelector('html');
+            var sidebar = null;
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="index.html">译者言</a></li><li class="chapter-item expanded "><a href="1-acknowledgments/index.html"><strong aria-hidden="true">1.</strong> 致谢</a></li><li class="chapter-item expanded "><a href="2-introduction/index.html"><strong aria-hidden="true">2.</strong> 介绍</a></li><li class="chapter-item expanded "><a href="3-what_is_a_query_engine/index.html"><strong aria-hidden="true">3.</strong> 什么是查询引擎</a></li><li class="chapter-item expanded "><a href="4-apache_arrow/index.html"><strong aria-hidden="true">4.</strong> Apache Arrow</a></li><li class="chapter-item expanded "><a href="5-type_system/index.html"><strong aria-hidden="true">5.</strong> 类型系统</a></li><li class="chapter-item expanded "><a href="6-data_sources/index.html"><strong aria-hidden="true">6.</strong> 数据源</a></li><li class="chapter-item expanded "><a href="7-logical_plans/index.html"><strong aria-hidden="true">7.</strong> 逻辑计划和表达式</a></li><li class="chapter-item expanded "><a href="8-dataframes/index.html"><strong aria-hidden="true">8.</strong> 数据帧</a></li><li class="chapter-item expanded "><a href="9-physical_plans/index.html"><strong aria-hidden="true">9.</strong> 物理计划和表达式</a></li><li class="chapter-item expanded "><a href="10-query_planner/index.html"><strong aria-hidden="true">10.</strong> 查询规划器</a></li><li class="chapter-item expanded "><a href="11-query_optimizations/index.html"><strong aria-hidden="true">11.</strong> 查询优化</a></li><li class="chapter-item expanded "><a href="12-query_execution/index.html"><strong aria-hidden="true">12.</strong> 查询执行</a></li><li class="chapter-item expanded "><a href="13-sql_support/index.html"><strong aria-hidden="true">13.</strong> SQL 支持</a></li><li class="chapter-item expanded "><a href="14-parallel_query_execution/index.html"><strong aria-hidden="true">14.</strong> 并行查询执行</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <!-- Track and set sidebar scroll position -->
+        <script>
+            var sidebarScrollbox = document.querySelector('#sidebar .sidebar-scrollbox');
+            sidebarScrollbox.addEventListener('click', function(e) {
+                if (e.target.tagName === 'A') {
+                    sessionStorage.setItem('sidebar-scroll', sidebarScrollbox.scrollTop);
+                }
+            }, { passive: true });
+            var sidebarScrollTop = sessionStorage.getItem('sidebar-scroll');
+            sessionStorage.removeItem('sidebar-scroll');
+            if (sidebarScrollTop) {
+                // preserve sidebar scroll position when navigating via links within sidebar
+                sidebarScrollbox.scrollTop = sidebarScrollTop;
+            } else {
+                // scroll sidebar to current active section when navigating via "next/previous chapter" buttons
+                var activeSection = document.querySelector('#sidebar .active');
+                if (activeSection) {
+                    activeSection.scrollIntoView({ block: 'center' });
+                }
+            }
+        </script>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">How Query Engines Work (中文版)</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/ArkToria/How_Query_Engines_Work" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="how-query-engines-work-中文版"><a class="header" href="#how-query-engines-work-中文版">How Query Engines Work 中文版</a></h1>
+<p>阅读地址: <a href="https://query.arktoria.org">https://query.arktoria.org</a></p>
+<p>英文原版: <a href="https://howqueryengineswork.com/">https://howqueryengineswork.com/</a></p>
+<p>原文许可：Copyright © 2020-2023 Andy Grove. All rights reserved</p>
+<p>译文许可：Creative Commons Attribution-ShareAlike 4.0 International License</p>
+<blockquote>
+<p>本人水平有限，有异议或补充的地方可以<a href="mailto:i@axionl.me">邮件形式</a>告知，或在 <a href="https://github.com/ArkToria/How_Query_Engines_Work/issues">Issues</a> 中提出并参与讨论。
+——译者：Ariel AxionL (艾雨寒)</p>
+</blockquote>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="acknowledgments-致谢"><a class="header" href="#acknowledgments-致谢">Acknowledgments 致谢</a></h1>
+<p>如果没有我家人的支持，这本书也不可能完成，但我沉浸在这个附属项目中的时候，他们给予了我极大的耐心。</p>
+<p>特别感谢 Matthew Powers，又名 Mr.Powers，他在一开始就激发了我写这本书的灵感。Matthew 是 《Writing Beautiful Apache Spark Code》的作者，这本书也可以在 <a href="https://leanpub.com/beautiful-spark">Leanpub</a> 上找到。</p>
+<p>同样也得感谢在过去几年从事 <a href="https://github.com/apache/arrow-datafusion">DataFusion</a> 项目期间与我有过互动的无数人，特别是 Apache Arrow PMC、以及其他的提交者和贡献者。</p>
+<p>最后，我要感谢在 RMS 工作期间 Chris George 和 Joe Buszkiewic 对我的支持和鼓励，在那里我进一步加深了对查询引擎的理解。</p>
+<p>这本书也可以在 <a href="https://leanpub.com/how-query-engines-work">https://leanpub.com/how-query-engines-work</a> 以 ePub、MOBI 和 PDF 格式购买。</p>
+<p><strong>Copyright © 2020-2023 Andy Grove. All rights reserved.</strong></p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="introduction-介绍"><a class="header" href="#introduction-介绍">Introduction 介绍</a></h1>
+<p>我自从开始第一份软件工程师的工作以来，一直痴迷于数据库和查询语言。向计算机提问并且高效地获取有用的数据是一件非常神奇的事情。在做了多年的常规软件开发人员和数据技术的终端用户后，我开始为一家初创公司工作，这让我深入了解分布式数据开发。这是一本我开始这段旅程之前就已经存在的书。尽管它只是一本入门级的书，当我希望能够揭开查询引擎工作原理的神秘面纱。</p>
+<p>我对于查询引擎的性质最终致使我参与了 Apache Arrow 项目，在该项目中，我在 2018 年贡献了最初的 Rust 实现，然后再 2019 年贡献了 DataFusion 内存式查询引擎，最终在 2021 年贡献了 Ballista 分布式计算项目。</p>
+<p>在 Rust 实现方面，Arrow 项目现在有着许多活跃的提交者和贡献者，并且与我最初贡献的版本相比，它有了显著的改进。</p>
+<p>尽管对于高性能查询引擎而言，Rust 语言是一个不错的选择，但它并不适合教授关于查询引擎的概念，因此我最近在写这本书的适合用 Kotlin 实现了一个新的查询引擎。Kotlin 是一门非常简洁易读的语言，因此可以子啊本书中包含源代码示例。我将鼓励您在阅读本书的过程中熟悉源代码，并考虑做出一些贡献。没有什么是比实践更好的学习方法了。</p>
+<p>本书中涉及的查询引擎最初是打算作为 Ballista 项目的一部分（并且持续了一段时间），但随着项目的发展，很明显，通过 UDF(用户定义函数) 机制将查询引擎保留在 Rust 中并支持 Java 和其它语言将更有意义，而不是在多种语言中重复大量的查询执行逻辑。</p>
+<p>现在 Ballista 项目已经贡献给了 Apache Arrow，我已经将这本书中配套代码库中的查询引擎简单地称为 &quot;KQuery&quot;，是 Kotlin Query Engine 的简称，但如果有人有更好的名称建议，请告诉我。</p>
+<p>这本书的后续篇章将可用版本更新时免费提供，因此请偶尔查看本书地址或者在 Twitter 上关注我 (@andygrove_io) 以便接收新内容可用通知。</p>
+<h2 id="feedback-反馈"><a class="header" href="#feedback-反馈">Feedback 反馈</a></h2>
+<p>如果您对本书有任何反馈，可以给我的 Twitter 账户 @andygrove_io 发送站内信或者向 agrove@apache.org 发送邮件。</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="what-is-a-query-engine-什么是查询引擎"><a class="header" href="#what-is-a-query-engine-什么是查询引擎">What Is a Query Engine? 什么是查询引擎？</a></h1>
+<p>查询引擎是一种软件，它可以对数据进行查询，以产生问题的答案，例如：</p>
+<ul>
+<li>今年到目前为止，我每月的平均销售额是多少？</li>
+<li>在过去的一天里，我的网站上最受欢迎的五个网页是什么？</li>
+<li>与一年前相比，网络流量的月度情况如何？</li>
+</ul>
+<p>最广泛使用的查询语言是结构化查询语言 (简称 SQL)。许多开发人员在他们的职业生涯中都会遇到关系型数据库，如 MySQL、Postgres、Oracle 或 SQL Server。所有这些数据库都包含支持 SQL 的查询引擎。</p>
+<p>这里有一些 SQL 请求示例：</p>
+<blockquote>
+<p>SQL 示例：月平均销售额</p>
+</blockquote>
+<pre><code class="language-sql">SELECT month, AVG(sales)
+FROM product_sales
+WHERE year = 2020
+GROUP BY month;
+</code></pre>
+<blockquote>
+<p>SQL 示例：昨天最热门的五个网页</p>
+</blockquote>
+<pre><code class="language-sql">SELECT page_url, COUNT(*) AS num_visits
+FROM apache_log
+WHERE event_date = yesterday()
+GROUP BY page_url
+ORDER BY num_visits DESC
+LIMIT 5;
+</code></pre>
+<p>SQL 功能强大且广为人知，但在所谓的 “大数据” 世界中存在局限性，数据科学家通常需要将自定义代码和查询混合在一起。Apache Hadoop、Apache Hive 和 Apache Spark 等平台和工具现在被广泛用于查询和操作大量数据。</p>
+<blockquote>
+<p>Apache Spark 使用 DataFrame 查询示例：</p>
+</blockquote>
+<pre><code class="language-kotlin">val spark: SparkSession = SparkSession.builder
+  .appName(&quot;Example&quot;)
+  .master(&quot;local[*]&quot;)
+  .getOrCreate()
+
+val df = spark.read.parquet(&quot;/mnt/nyctaxi/parquet&quot;)
+  .groupBy(&quot;passenger_count&quot;)
+  .sum(&quot;fare_amount&quot;)
+  .orderBy(&quot;passenger_count&quot;)
+
+df.show()
+</code></pre>
+<h2 id="why-are-query-engines-popular-为什么查询引擎广受欢迎"><a class="header" href="#why-are-query-engines-popular-为什么查询引擎广受欢迎">Why Are Query Engines Popular? 为什么查询引擎广受欢迎？</a></h2>
+<p>数据增长的加速度越来越大，通常无法在一台计算机上容纳。需要专业的工程师来编写分布式代码以查询数据，并且每次需要从数据中获取新答案时都编写自定义代码是不切实际的。查询引擎提供了一组标准操作和转换方式，因此终端用户可以通过以不同方式将简单的查询语言或应用程序编程接口 (API) 进行组合和转换，并进行调优以获得良好的性能。</p>
+<h2 id="what-this-book-covers-本书涵盖了什么内容"><a class="header" href="#what-this-book-covers-本书涵盖了什么内容">What This Book Covers 本书涵盖了什么内容</a></h2>
+<p>本书概述了构建通用查询引擎所涉及的每个步骤。本书中讨论的查询引擎是专门为本书开发的一个简单的查询疫情，其代码是在编写本书内容的同时开发的，以确保我在面临涉及决策时可以编写有关的主题内容。</p>
+<h2 id="source-code-源代码"><a class="header" href="#source-code-源代码">Source Code 源代码</a></h2>
+<p>本书所讨论的完整的查询引擎代码在 Github 仓库：</p>
+<blockquote>
+<p>https://github.com/andygrove/how-query-engines-work</p>
+</blockquote>
+<p>有关使用 Gradle 构建项目的最新说明请参阅项目中的 README 文档。</p>
+<h2 id="why-kotlin-为什么使用-kotlin"><a class="header" href="#why-kotlin-为什么使用-kotlin">Why Kotlin? 为什么使用 Kotlin?</a></h2>
+<p>本书的重点是查询引擎设计，这通常是编程语言不可或缺的。我在本书中之所以选择 Kotlin，是因为它简洁易懂。并且它也与 Java 100% 兼容，这意味着您可以从 Java 或者其它基于 Java 的语言 (比如 Scala) 调用 Kotlin 代码。</p>
+<p>尽管如此，Apache Arrow 项目中的 DataFusion 查询引擎也主要是基于本书中的设计。对 Rust 比 JVM 更感兴趣的读者可以参考 DataFusion 源代码和本书。</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="apache-arrow"><a class="header" href="#apache-arrow">Apache Arrow</a></h1>
+<p>Apache Arrow 最开始是作为列式数据的内存规范，并以 Java 和 C++ 进行实现。这种内存格式对于支持 SIMD (单指令，多数据) 的 CPU 和 GPU 等现代硬件的矢量化处理是非常有效率的的。</p>
+<p>采用标准化的数据内存格式有以下几个好处：</p>
+<ul>
+<li>
+<p>如 Python 或 Java 等高级语言可以通过传递数据指针来调用 Rust 或 C++ 等低级语言来完成计算密集型任务，而不是以另一种格式复制数据，这样造成的开销会非常大。</p>
+</li>
+<li>
+<p>由于内存格式也是网络传输格式 (尽管数据也能被压缩)，数据可以在进程之间有效的地传输，而不需要太多的序列化开销。</p>
+</li>
+<li>
+<p>它应该能让数据科学和数据分析领域的各种开源和商业项目之间构建连接器、驱动程序和集成变得更加容易，并允许开发人员使用他们偏好的语言来利用这些平台。</p>
+</li>
+</ul>
+<p>Apache Arrow 现在在许多编程语言中都有实现，包括 C、C++、C#、Go、Java、JavaScript、Julia、MATLAB、Python、R、Ruby 和 Rust。</p>
+<h2 id="arrow-memory-model-内存模型"><a class="header" href="#arrow-memory-model-内存模型">Arrow Memory Model 内存模型</a></h2>
+<p>在 <a href="https://arrow.apache.org/docs/format/Columnar.html">Arrow</a> 的网站上详细描述了这一内存模型，但实际上每一个列都是由单个向量表示，其中包含原始数据，以及表示空值的独立向量和可变宽度类型的原始数据偏移量。</p>
+<h2 id="inter-process-communication-ipc-程间通讯"><a class="header" href="#inter-process-communication-ipc-程间通讯">Inter-Process Communication (IPC) 程间通讯</a></h2>
+<p>正如之前所提，可以通过指针在进程和进程之间传递数据。然而，接收进程需要知道如何解析这些数据，因此交换元数据 (如 schema 结构信息) 定义了 IPC 的数据格式。Arrow 使用 Google Flatbuffers 进行元数据格式定义。</p>
+<h2 id="compute-kernels-计算内核"><a class="header" href="#compute-kernels-计算内核">Compute Kernels 计算内核</a></h2>
+<p>Apache Arrow 的范围已经扩展到提供计算库来评估数据表达式。Java、C++、C、Python、Ruby、Go、Rust 和 JavaScript 实现等都包含了用于在 Arrow 内存块上执行计算的计算库。</p>
+<p>由于这本书主要涉及 Java 实现，值得指出的是，Dremio 最近贡献了 Gandiva 项目，这是一个 Java 库，可以将表达式编译为 LLVM，并支持 SIMD。JVM 开发者可以将操作委托给 Gandava 库，并从中获得纯 Java 实现中难以企及的性能提升 。</p>
+<h2 id="arrow-flight-protocol"><a class="header" href="#arrow-flight-protocol">Arrow Flight Protocol</a></h2>
+<p>最近，Arrow 已经定义了一个名为 <a href="https://arrow.apache.org/docs/format/Flight.html">Flight</a> 的协议，以便在网络上高效地传输 Arrow 数据。Flight 基于 <a href="https://grpc.io/">gRPC</a> 和 <a href="https://protobuf.dev/">Google Protocol Buffers</a>.</p>
+<p>Flight 协议由以下方法定义了一个 FlightService:</p>
+<blockquote>
+<p>译者注：在阅读下文之前先对 Google Protobuf 和 gRPC 中的 Service、Client Side 接口和 Stream 有所了解。</p>
+<p><a href="https://grpc.io/docs/what-is-grpc/introduction/">what is grpc</a></p>
+</blockquote>
+<h3 id="handshake"><a class="header" href="#handshake">Handshake</a></h3>
+<p>客户端与服务端之间的握手。根据服务器的不同，可能需要握手来决定用于未来操作的 Token。根据验证机制，请求和响应应都是允许多次往返的数据流 (gRPC Stream)。</p>
+<h3 id="lightflights"><a class="header" href="#lightflights">LightFlights</a></h3>
+<p>获取给定特定条件下的可用流列表。大多数 Flight 服务都会公开一个或多个流。这个 API 允许列出可用的流。用户也可以提供一套标准，用于限制通过该接口列出的流的子集。每个 Flight 服务都允许自己定义如何使用标准。</p>
+<h3 id="getflightinfo"><a class="header" href="#getflightinfo">GetFlightInfo</a></h3>
+<p>对于给定的 FilgthDescriptor，获取有关 Flight 可以如何被消费的信息。如果接口的使用者已经可以识别要消费的特定 Flight，那这将会是一个非常有用的接口。该接口还允许消费者通过指定的描述符生成 Flight 流。例如：一个 Flight 描述符可能包含待执行的 SQL 语句或<a href="https://docs.python.org/3/library/pickle.html">序列化的 Python 操作</a>。在这些情况下，之前在 ListFilghts 可用流列表中未提供的流，反而在特定的 Flight 服务定义期间是可用的。</p>
+<h3 id="getschema"><a class="header" href="#getschema">GetSchema</a></h3>
+<p>对于给定的 FlightDescriptor，获取 Schema.fbs::Schema 中描述的 Schema。该接口被用于当消费者需要 Flight 流的 Schema 时。与 GetFlightInfo 类似，该接口可以生成一个之前在 ListFlights 可用列表中未列出的新的 Flight。</p>
+<h3 id="doget"><a class="header" href="#doget">DoGet</a></h3>
+<p>检索与引用 ticket 相关的特定描述符所关联的单个流。Flight 可以由一个或多个数据流组成，其中每个数据流都可以使用单独的 opaque ticket 不透明凭证进行检索，Flight 服务使用该 ticket 管理数据流的集合。</p>
+<h3 id="doput"><a class="header" href="#doput">DoPut</a></h3>
+<p>将流推送到与特定 Flight 流相关的 Flight 服务。这允许 Flight 服务的客户端上传数据流。根据特定的 Flight 服务，可以允许客户端消费者上传每个描述符的单个流，也可以上传数量不限的流。后者，服务可能会实现一个 &quot;seal&quot; 动作，一旦所有的流被上传，这个动作就可以应用到一个描述符上。</p>
+<h3 id="doexchange"><a class="header" href="#doexchange">DoExchange</a></h3>
+<p>为指定描述符打开双向数据通道。这允许客户端在单个逻辑流中发送和接收任意 Arrow 数据和特定应用程序的元数据。与 DoGet/DoPut 不同的是，这样操作更适合将计算（而非存储）转移到 Flight 服务的客户端。</p>
+<h3 id="doaction"><a class="header" href="#doaction">DoAction</a></h3>
+<p>除了可能提供的 ListFlights、GetFlightInfo、DoGet 和 DoPut 操作外，Flight 服务还可以支持任意数量的简单操作。DoAction 允许 Flight 客户端对 Flight 服务执行特定事件。一个事件包括 opaque request 匿名请求和响应对象，这些对象与所执行的事件类型有关。</p>
+<h3 id="listactions"><a class="header" href="#listactions">ListActions</a></h3>
+<p>Flight 服务会暴露出所有可用的事件类型及其说明。这可以让不同的 Flight 消费者了解到 Flight 服务所提供的功能。</p>
+<h2 id="arrow-flight-sql"><a class="header" href="#arrow-flight-sql">Arrow Flight SQL</a></h2>
+<p>有人提议为 Arrow Flight 添加 SQL 功能。在撰写本报告时 (2021 年 1 月)，有一份 C++ 实现的 PR，跟踪 Issue 是 <a href="https://github.com/apache/arrow/pull/12616">ARROW-14698</a>。</p>
+<h2 id="query-engines-查询引擎"><a class="header" href="#query-engines-查询引擎">Query Engines 查询引擎</a></h2>
+<h3 id="datafusion"><a class="header" href="#datafusion">DataFusion</a></h3>
+<p>Arrow 的 Rust 实现包含一个名为 DataFusion 的内存查询引擎，该引擎于 2019 年贡献给该项目。该项目正在迅速成熟，并获得了越来越多的关注。例如，InfluxData 正在利用 DataFusion 构建<a href="https://www.influxdata.com/glossary/apache-datafusion/">下一代 InfluxDB 内核</a>。</p>
+<h3 id="ballista"><a class="header" href="#ballista">Ballista</a></h3>
+<p>Ballista 是一个主要由 Rust 实现、Apache Arrow 支持的的分布式计算平台。它的架构允许其它编程语言 (如 Python、C++ 和 Java) 作为一等公民获得支持，而无需考虑序列化开销。</p>
+<p>Ballista 的技术基础如下：</p>
+<ul>
+<li>Apache Arrow 用于内存模型和类型系统</li>
+<li>Apache Arrow Flight 协议，用于在进程间高效传输数据</li>
+<li>Apache Arrow Flight SQL 协议，用于商业智能工具和 JDBC 驱动程序连接 Ballista 集群</li>
+<li>Google Protocol Buffers，用于序列化查询计划、</li>
+<li>Docker 用于打包执行器和用户自定义代码</li>
+<li>Kubernetes 用于部署和管理执行器所在的 docker 容器</li>
+</ul>
+<p>Ballista 于 2021 年贡献给 Arrow 项目，目前还不能用于生产，不过它能够以良好的性能运行主流 TPC-H 基准中的许多查询案例。</p>
+<h3 id="c-query-engine"><a class="header" href="#c-query-engine">C++ Query Engine</a></h3>
+<p>新增的 C++ 版本查询引擎正在实现中，当下的重点是实现高效计算和数据集 API。</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="choosing-a-type-system-选择一个类型系统"><a class="header" href="#choosing-a-type-system-选择一个类型系统">Choosing a Type System 选择一个类型系统</a></h1>
+<blockquote>
+<p>本章节所讨论的源代码可以在 KQuery 项目的 <a href="https://github.com/andygrove/how-query-engines-work/tree/main/jvm/datatypes">datatypes</a> 模块中找到。</p>
+</blockquote>
+<p>构建查询引擎的第一步是选择一个类型系统来表示查询引擎将要处理的不同类型的数据。有种方法是为查询引擎发明一个专有的类型系统。另一种方法是使用查询引擎所要查询的数据源的类型系统。</p>
+<p>如果查询引擎将支持多个数据源（通常是这种情况），那么每所支持的数据源和查询引擎的类型系统之间可能需要进行一些转换，因此使用一个兼容并包的类型系统非常重要。</p>
+<h2 id="row-based-or-columnar-基于行式还是列式"><a class="header" href="#row-based-or-columnar-基于行式还是列式">Row-Based or Columnar? 基于行式还是列式？</a></h2>
+<p>一个重要的考察因素就是查询引擎是逐行处理，还是以列格式表示数据。</p>
+<p>如今许多的查询引擎都是基于 <a href="https://paperhub.s3.amazonaws.com/dace52a42c07f7f8348b08dc2b186061.pdf">Volcano Query Planner</a>，其在物理层上的每一步基本都是以行迭代器为规划的。这种模型实现起来很简单，但是在对数十亿数据进行查询的时候，查询每行的开销往往会快速增加。通过对数据进行批量迭代，可以减少这种开销。此外，如果这些批量数据代表的是列数据而不是行数据，那么就可以使用 &quot;矢量化处理&quot;，利用 SIMD (单指令多数据) 的又是，用一条 CPU 指令处理一列中的多个值。通过利用 GPU 来并行处理跟大量的数据，这个概念还可以更进一步。</p>
+<h2 id="interoperability-可交互性"><a class="header" href="#interoperability-可交互性">Interoperability 可交互性</a></h2>
+<p>另一个考虑的因素是，我们可能希望用多种编程语言访问我们的查询疫情。查询引擎用户通常使用 Python、R 或 Java 等语言。我们可能还想构建 ODBC 或 JDBC 驱动程序，便于构建和集成。</p>
+<p>考虑到这些需求，最好能找到一种行业标准来表示列式数据，并在进程之间高效交换这些数据。</p>
+<p>我认为 Apache Arrow 提供了一个理想的基础，这一结论可能不出所料。</p>
+<h2 id="type-system-类型系统"><a class="header" href="#type-system-类型系统">Type System 类型系统</a></h2>
+<p>我们将使用 Apache Arrow 作类型系统的基础。下面的 Arrow 用于表示模式、字段和数据类型。</p>
+<ul>
+<li>Schema 模式为数据源或查询结果提供元数据。模式由一个或多个字段组成</li>
+<li>Field 为模式中的字段提供名称和数据类型，并指定是否允许空值</li>
+<li>FieldVector 为字段提供列式数据存储</li>
+<li>ArrowType 表示数据类型</li>
+</ul>
+<p>KQuery 引入了一些额外的类和助手，作为 Apache Arrow 类型系统的抽象。</p>
+<p>KQuery 为受支持的 Arrow 数据类型提供了可引用的产量。</p>
+<pre><code class="language-kotlin">object ArrowTypes {
+    val BooleanType = ArrowType.Bool()
+    val Int8Type = ArrowType.Int(8, true)
+    val Int16Type = ArrowType.Int(16, true)
+    val Int32Type = ArrowType.Int(32, true)
+    val Int64Type = ArrowType.Int(64, true)
+    val UInt8Type = ArrowType.Int(8, false)
+    val UInt16Type = ArrowType.Int(16, false)
+    val UInt32Type = ArrowType.Int(32, false)
+    val UInt64Type = ArrowType.Int(64, false)
+    val FloatType = ArrowType.FloatingPoint(FloatingPointPrecision.SINGLE)
+    val DoubleType = ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE)
+    val StringType = ArrowType.Utf8()
+}
+</code></pre>
+<p>KQuery 并没有直接使用 <code>FieldVector</code>，而是引入了一个 <code>ColumnVector</code> 接口作为抽象，以提供更方便的访问方法，从而避免了每注数据类型都使用特定的 <code>FieldVector</code> 实现。</p>
+<pre><code class="language-kotlin">interface ColumnVector {
+  fun getType(): ArrowType
+  fun getValue(i: Int) : Any?
+  fun size(): Int
+}
+</code></pre>
+<p>这种抽象也使得标量值的实现称为可能，从而避免了用字面值为列中每个索引重复创建和填入 <code>FieldVector</code>。</p>
+<pre><code class="language-kotlin">class LiteralValueVector(
+    val arrowType: ArrowType,
+    val value: Any?,
+    val size: Int) : ColumnVector {
+
+  override fun getType(): ArrowType {
+    return arrowType
+  }
+
+  override fun getValue(i: Int): Any? {
+    if (i&lt;0 || i&gt;=size) {
+      throw IndexOutOfBoundsException()
+    }
+    return value
+  }
+
+  override fun size(): Int {
+    return size
+  }
+}
+</code></pre>
+<p>KQuery 还提供了一个 RecordBatch 来表示批量处理的列式数据。</p>
+<pre><code class="language-kotlin">class RecordBatch(val schema: Schema, val fields: List&lt;ColumnVector&gt;) {
+
+  fun rowCount() = fields.first().size()
+
+  fun columnCount() = fields.size
+
+  /** Access one column by index */
+  fun field(i: Int): ColumnVector {
+      return fields[i]
+  }
+}
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="data-sources-数据源"><a class="header" href="#data-sources-数据源">Data Sources 数据源</a></h1>
+<blockquote>
+<p>本章讨论的源代码可以在 KQuery 项目的 <a href="https://github.com/andygrove/how-query-engines-work/tree/main/jvm/datasource">datasource</a> 模块中找到。</p>
+</blockquote>
+<p>如果没有可读取的数据源，查询引擎便无计可施，为此我们希望能够支持多种数据源。因此为查询引擎创建一个可以用来与数据源交互的接口就显得尤为重要。这也允许用户将我们的查询引擎用于他们自定义的数据源。数据源通常是文件或者数据库，当也可以是内存对象。</p>
+<h2 id="data-source-interface-数据源接口"><a class="header" href="#data-source-interface-数据源接口">Data Source Interface 数据源接口</a></h2>
+<p>在查询计划过程中，必须要了解数据源的模式 (schema)，这样才能验证查询计划，确保所引用的列存在，并且数据类型与用于引用列的表达式兼容。在某些情况下，可能无法获得模式，因为某些数据源没有固定的模式，这种情况通常被称为 <code>schema-less</code>。JSON 文档就是一个无模式数据源的例子。</p>
+<p>在执行期间，我们需要能够从数据源中获取数据的能力，并要能够指定将哪些列加载到内存中以提高效率。如果查询不引用列，就没必要将其加载到内存中。</p>
+<p>KQuery 数据源接口</p>
+<pre><code class="language-kotlin">interface DataSource {
+
+  /** Return the schema for the underlying data source */
+  fun schema(): Schema
+
+  /** Scan the data source, selecting the specified columns */
+  fun scan(projection: List&lt;String&gt;): Sequence&lt;RecordBatch&gt;
+}
+</code></pre>
+<h2 id="data-source-examples-数据源示例"><a class="header" href="#data-source-examples-数据源示例">Data Source Examples 数据源示例</a></h2>
+<h3 id="comma-separated-values-csv"><a class="header" href="#comma-separated-values-csv">Comma-Separated Values (CSV)</a></h3>
+<p>CSV 文件是每行一个记录的文本文件，字段之间使用逗号分隔，因此称为 “逗号分隔值”。CSV 文件不包含模式信息（除文件第一行的可选列名），尽管可以通过想读取文件来派生出模式。但这可能是一个开销高昂的操作。</p>
+<h3 id="json"><a class="header" href="#json"><a href="https://www.json.org/json-en.html">JSON</a></a></h3>
+<p>JavaScript Object Notation 格式 (JSON) 是另一种流行的基于文本的文件格式。与 CSV 文件不同，JSON 的文件是结构化的，可以存储复杂的嵌套数据类型。</p>
+<h3 id="parquet"><a class="header" href="#parquet"><a href="https://parquet.apache.org/">Parquet</a></a></h3>
+<p>Parquet 的创建是为了提供一种压缩、高效的列式数据表示，它是 Hadoop 生态系统中一种流行的文件格式。Parquet 从一开始就考虑到了复杂的嵌套数据结构，并使用了 Dremel 论文中描述的 <code>record shredding and assembly</code> 算法。</p>
+<p>Parquet 文件包含模式信息，数据按 batch 批量存储 (称为 “行组”)，其中每个批量数据由列组成。行组可以包含压缩数据，也可以包含可选的元数据，例如每列的最大值和最小值。可以对查询引擎进行优化，以使用该元数据来确定在扫描期间可以跳过行组的时机。</p>
+<h3 id="optimized-row-columnar-orc"><a class="header" href="#optimized-row-columnar-orc"><a href="https://orc.apache.org/docs/">Optimized Row Columnar (Orc)</a></a></h3>
+<p>行优化列 (Orc) 格式类似于 Parquet 格式。数据以列传进行批量储存，称为 “stripes 条纹”。</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="logical-plans--expressions-逻辑计划和表达式"><a class="header" href="#logical-plans--expressions-逻辑计划和表达式">Logical Plans &amp; Expressions 逻辑计划和表达式</a></h1>
+<blockquote>
+<p>本章讨论的源代码可以在 KQuery 项目的 <a href="https://github.com/andygrove/how-query-engines-work/blob/main/jvm/logical-plan">logical-plan</a> 模块中找到。</p>
+</blockquote>
+<p>一个逻辑计划表示具有已知模式的关系（一组元组）。每个逻辑计划可以由零个或者多个逻辑计划作为输入。对于逻辑计划来说，暴露它的子计划是很方便的，这样以访问者模式就可以对计划进行遍历。</p>
+<blockquote>
+<p>译者注：此处的 Logical Plans 指的是一种可递归的树结构，其继承自 Query Plans。</p>
+</blockquote>
+<pre><code class="language-kotlin">interface LogicalPlan {
+  fun schema(): Schema
+  fun children(): List&lt;LogicalPlan&gt;
+}
+</code></pre>
+<h2 id="printing-logical-plans-打印逻辑计划"><a class="header" href="#printing-logical-plans-打印逻辑计划">Printing Logical Plans 打印逻辑计划</a></h2>
+<p>能够以人类可读形式打印逻辑计划在调试过程中有着不可或缺的意义。逻辑哦计划通常打印成以子节点索引的层次结构。</p>
+<p>我们可以实现一个简单的递归助手函数，用于逻辑计划的格式化输出。</p>
+<pre><code class="language-kotlin">fun format(plan: LogicalPlan, indent: Int = 0): String {
+  val b = StringBuilder()
+  0.rangeTo(indent).forEach { b.append(&quot;\t&quot;) }
+  b.append(plan.toString()).append(&quot;\n&quot;)
+  plan.children().forEach { b.append(format(it, indent+1)) }
+  return b.toString()
+}
+</code></pre>
+<p>下面是使用该方法进行逻辑计划格式化的结果示例：</p>
+<pre><code>Projection: #id, #first_name, #last_name, #state, #salary
+  Filter: #state = 'CO'
+    Scan: employee.csv; projection=None
+</code></pre>
+<h2 id="serialization-序列化"><a class="header" href="#serialization-序列化">Serialization 序列化</a></h2>
+<p>有时候需要能够序列化查询计划，以便可以轻松实现在进程之间转移。在早期添加序列化是一个好习惯，对不小心引用了无法序列化的数据结构（例如文件句柄或数据库连接）采取预防措施。</p>
+<p>一种方法是采用所实现语言的默认机制来序列化数据结构，以符合 JSON 等格式。例如，在 Java 中可以使用 <a href="https://github.com/FasterXML/jackson">Jackson</a>，而 Kotlin 有 <a href="https://github.com/Kotlin/kotlinx.serialization">kotlinx.serialization</a> 库，对于 Rust 有 <a href="https://docs.rs/serde/latest/serde/">serde</a> crate。</p>
+<p>另一种选择是使用 Avro、Thrift 或 Protocol Buffers 这类与语言无关的序列化格式，然后编写代码实现在这种格式和特定语言之间的转换。</p>
+<p>自从本书出版第一版以来，出现了一个名为 <a href="https://substrait.io/">&quot;substrait&quot;</a> 的新标准，目的是为关系代数提供跨语言序列化。我对这个项目感到非常兴奋，并预测它将因代表了查询计划和开创许多集成可能性而成为事实标准。例如，可以使用基于 Java 的成熟的规划器，如 <a href="https://calcite.apache.org/">Apache Calcite</a>，以 Substrait 格式序列化计划，然后在较低级别的语言（如 C++ 或 Rust）实现的查询引擎中执行该计划。更多信息请访问 <a href="https://substrait.io/">https://substrait.io/</a>。</p>
+<h2 id="logical-expressions-逻辑表达式"><a class="header" href="#logical-expressions-逻辑表达式">Logical Expressions 逻辑表达式</a></h2>
+<p>表达式这一概念是查询计划的基本构建块之一，其可以在运行时对数据进行评估。</p>
+<p>下面是查询引擎中常见支持的表达式示例：</p>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: left">表达式</th><th style="text-align: left">示例</th></tr></thead><tbody>
+<tr><td style="text-align: left">Literal Value 字面值</td><td style="text-align: left">&quot;hello&quot;, 12.34</td></tr>
+<tr><td style="text-align: left">Column Reference 列引用</td><td style="text-align: left">user_id, first_name, last_name</td></tr>
+<tr><td style="text-align: left">Math Expression 数学表达式</td><td style="text-align: left">salary * state_tax</td></tr>
+<tr><td style="text-align: left">Comparison Expression 比较表达式</td><td style="text-align: left">x &gt;= y</td></tr>
+<tr><td style="text-align: left">Boolean Expression 布尔表达式</td><td style="text-align: left">birthday = today() AND age &gt;= 21</td></tr>
+<tr><td style="text-align: left">Arrgregate Expression 聚合表达式</td><td style="text-align: left">MIN(salary), MAX(salary), SUM(salary), AVG(salary), COUNT(*)</td></tr>
+<tr><td style="text-align: left">Scalar Function 标量函数</td><td style="text-align: left">CONCAT(first_name, &quot; &quot;, last_name)</td></tr>
+<tr><td style="text-align: left">Aliased Expression 别名表达式</td><td style="text-align: left">salary * 0.02 AS pay_increase</td></tr>
+</tbody></table>
+</div>
+<p>当然，所有这些表达式都可以组合起来形成具有深度的嵌套表达式树。表达式求值是递归编程的经典案例。</p>
+<p>当我们计划进行查询时，我们需要知道一些关于表达式输出的基本元数据。具体来说，我们需要表达式有一个名称，以便其它表达式可以引用它，并且我们需要知道表达式在求值时将产生得值的数据类型，以便我们可以验证查询计划是否有效。例如，如果我们有一个表达式 <code>a + b</code>，则只有当 <code>a</code> 和 <code>b</code> 都为数字类型的情况下该表达式才有效。</p>
+<p>还要注意，表达式的数据类型可以依赖于输入数据。例如，列引用将具有它所引用的列的数据类型，但是比较表达式总是返回布尔值。</p>
+<pre><code class="language-kotlin">interface LogicalExpr {
+  fun toField(input: LogicalPlan): Field
+}
+</code></pre>
+<h3 id="column-expressions-列式表达式"><a class="header" href="#column-expressions-列式表达式">Column Expressions 列式表达式</a></h3>
+<p>列式表达式仅表示对指定列的引用。此表达式的元数据是通过查找输入中指定的列，并返回该列的元数据派生的。注意，这里的术语“列”是指输入逻辑计划生成的列，可以表示数据源中的列，也可以表示对其它输入求值表达式的结果。</p>
+<pre><code class="language-kotlin">class Column(val name: String): LogicalExpr {
+  override fun toField(input: LogicalPlan): Field {
+    return input.schema().fields.find { it.name == name } ?:
+      throw SQLException(&quot;No column named '$name'&quot;)
+  }
+
+  override fun toString(): String {
+    return &quot;#$name&quot;
+  }
+}
+</code></pre>
+<h3 id="literal-expression-字面值表达式"><a class="header" href="#literal-expression-字面值表达式">Literal Expression 字面值表达式</a></h3>
+<p>我们需要将字面值转化为表达式的能力，以便我们可以编写诸如 salary * 0.05 这类的表达式。</p>
+<p>下面是字面字符串表达式的示例：</p>
+<pre><code class="language-kotlin">class LiteralString(val str: String): LogicalExpr {
+  override fun toField(input: LogicalPlan): Field {
+    return Field(str, ArrowTypes.StringType)
+  }
+
+  override fun toString(): String {
+    return &quot;'$str'&quot;
+  }
+}
+</code></pre>
+<p>下面是字面长整型表达式的示例：</p>
+<pre><code class="language-kotlin">class LiteralLong(val n: Long): LogicalExpr {
+  override fun toField(input: LogicalPlan): Field {
+      return Field(n.toString(), ArrowTypes.Int64Type)
+  }
+
+  override fun toString(): String {
+      return n.toString()
+  }
+}
+</code></pre>
+<h3 id="binary-expressions-二元表达式"><a class="header" href="#binary-expressions-二元表达式">Binary Expressions 二元表达式</a></h3>
+<p>二元表达式是仅有两个输入的表达式。我们将实现三种类型的二元表达式：比较表达式、布尔表达式和数学表达式。因为所有这些的字符串表示都是相同的，所以我们可以使用公共基类提供的 toString 方法。变量 'l' 和 'r' 分别代表左右输入。</p>
+<pre><code class="language-kotlin">abstract class BinaryExpr(
+    val name: String,
+    val op: String,
+    val l: LogicalExpr,
+    val r: LogicalExpr) : LogicalExpr {
+  override fun toString(): String {
+    return &quot;$l $op $r&quot;
+  }
+}
+</code></pre>
+<p>比较表达式，例如：= 或 &lt; 比较两个相同类型数据，并返回一个布尔值。我们还需要实现布尔运算符 <code>AND</code> 和 <code>OR</code>，它们也接收两个参数并产生一个布尔结果，因此我们也可以为它们使用一个公共的基类。</p>
+<pre><code class="language-kotlin">abstract class BooleanBinaryExpr(
+    name: String,
+    op: String,
+    l: LogicalExpr,
+    r: LogicalExpr) : BinaryExpr(name, op, l, r) {
+  override fun toField(input: LogicalPlan): Field {
+      return Field(name, ArrowTypes.BooleanType)
+  }
+}
+</code></pre>
+<p>这个基类提供了一种实现具体比较表达式的简明方法。</p>
+<h3 id="comparison-expressions-比较表达式"><a class="header" href="#comparison-expressions-比较表达式">Comparison Expressions 比较表达式</a></h3>
+<pre><code class="language-kotlin">/** Equality (`=`) comparison */
+class Eq(l: LogicalExpr, r: LogicalExpr)
+    : BooleanBinaryExpr(&quot;eq&quot;, &quot;=&quot;, l, r)
+
+/** Inequality (`!=`) comparison */
+class Neq(l: LogicalExpr, r: LogicalExpr)
+    : BooleanBinaryExpr(&quot;neq&quot;, &quot;!=&quot;, l, r)
+
+/** Greater than (`&gt;`) comparison */
+class Gt(l: LogicalExpr, r: LogicalExpr)
+    : BooleanBinaryExpr(&quot;gt&quot;, &quot;&gt;&quot;, l, r)
+
+/** Greater than or equals (`&gt;=`) comparison */
+class GtEq(l: LogicalExpr, r: LogicalExpr)
+    : BooleanBinaryExpr(&quot;gteq&quot;, &quot;&gt;=&quot;, l, r)
+
+/** Less than (`&lt;`) comparison */
+class Lt(l: LogicalExpr, r: LogicalExpr)
+    : BooleanBinaryExpr(&quot;lt&quot;, &quot;&lt;&quot;, l, r)
+
+/** Less than or equals (`&lt;=`) comparison */
+class LtEq(l: LogicalExpr, r: LogicalExpr)
+    : BooleanBinaryExpr(&quot;lteq&quot;, &quot;&lt;=&quot;, l, r)
+</code></pre>
+<h3 id="boolean-expressions-布尔表达式"><a class="header" href="#boolean-expressions-布尔表达式">Boolean Expressions 布尔表达式</a></h3>
+<p>基类还提供了一种实现具体布尔逻辑表达式的简明方法。</p>
+<pre><code class="language-kotlin">/** Logical AND */
+class And(l: LogicalExpr, r: LogicalExpr)
+    : BooleanBinaryExpr(&quot;and&quot;, &quot;AND&quot;, l, r)
+
+/** Logical OR */
+class Or(l: LogicalExpr, r: LogicalExpr)
+    : BooleanBinaryExpr(&quot;or&quot;, &quot;OR&quot;, l, r)
+</code></pre>
+<h3 id="math-expressions-数学表达式"><a class="header" href="#math-expressions-数学表达式">Math Expressions 数学表达式</a></h3>
+<p>数学表达式是另一种特异化的二元表达式。数学表达式通常对相同数据类型的值进行操作，并产生相同数据类型的结果。</p>
+<pre><code class="language-kotlin">abstract class MathExpr(
+    name: String,
+    op: String,
+    l: LogicalExpr,
+    r: LogicalExpr) : BinaryExpr(name, op, l, r) {
+  override fun toField(input: LogicalPlan): Field {
+      return Field(&quot;mult&quot;, l.toField(input).dataType)
+  }
+}
+
+class Add(l: LogicalExpr, r: LogicalExpr) : MathExpr(&quot;add&quot;, &quot;+&quot;, l, r)
+class Subtract(l: LogicalExpr, r: LogicalExpr) : MathExpr(&quot;subtract&quot;, &quot;-&quot;, l, r)
+class Multiply(l: LogicalExpr, r: LogicalExpr) : MathExpr(&quot;mult&quot;, &quot;*&quot;, l, r)
+class Divide(l: LogicalExpr, r: LogicalExpr) : MathExpr(&quot;div&quot;, &quot;/&quot;, l, r)
+class Modulus(l: LogicalExpr, r: LogicalExpr) : MathExpr(&quot;mod&quot;, &quot;%&quot;, l, r)
+</code></pre>
+<h3 id="aggregate-expressions-聚合表达式"><a class="header" href="#aggregate-expressions-聚合表达式">Aggregate Expressions 聚合表达式</a></h3>
+<p>聚合表达式对输入表达式执行诸如 <code>MIN</code>、<code>MAX</code>、<code>COUNT</code>、<code>SUM</code> 或 <code>AVG</code> 等聚合函数。</p>
+<pre><code class="language-kotlin">abstract class AggregateExpr(
+    val name: String,
+    val expr: LogicalExpr) : LogicalExpr {
+
+  override fun toField(input: LogicalPlan): Field {
+    return Field(name, expr.toField(input).dataType)
+  }
+
+  override fun toString(): String {
+    return &quot;$name($expr)&quot;
+  }
+}
+</code></pre>
+<p>对于聚合表达式而言，若聚合数据类型与输入类型相同，我们可以简单地扩展这个基类。</p>
+<pre><code class="language-kotlin">class Sum(input: LogicalExpr) : AggregateExpr(&quot;SUM&quot;, input)
+class Min(input: LogicalExpr) : AggregateExpr(&quot;MIN&quot;, input)
+class Max(input: LogicalExpr) : AggregateExpr(&quot;MAX&quot;, input)
+class Avg(input: LogicalExpr) : AggregateExpr(&quot;AVG&quot;, input)
+</code></pre>
+<p>对于聚合表达式而言，若数据类型并不依赖于输入数据类型，我们需要重写 <code>toField</code> 方法。例如：&quot;COUNT&quot; 聚合表达式总是生成一个整数，而不管被计数的值的数据类型是什么。</p>
+<pre><code class="language-kotlin">class Count(input: LogicalExpr) : AggregateExpr(&quot;COUNT&quot;, input) {
+
+  override fun toField(input: LogicalPlan): Field {
+    return Field(&quot;COUNT&quot;, ArrowTypes.Int32Type)
+  }
+
+  override fun toString(): String {
+    return &quot;COUNT($expr)&quot;
+  }
+}
+</code></pre>
+<h2 id="logicasl-plans-逻辑计划"><a class="header" href="#logicasl-plans-逻辑计划">Logicasl Plans 逻辑计划</a></h2>
+<p>有了逻辑表达式，我们现在可以为查询引擎将要支持的逻辑计划实现各种转换。</p>
+<h3 id="scan-扫描"><a class="header" href="#scan-扫描">Scan 扫描</a></h3>
+<p><code>Scan</code> 扫描逻辑计划表示按可选 <code>projection</code> 映射从 <code>DataSource</code> 数据源中获取数据。<code>Scan</code> 是查询引擎中唯一没有其它逻辑计划作为输入的逻辑计划，它是查询树中的叶节点。</p>
+<pre><code class="language-kotlin">class Scan(
+    val path: String,
+    val dataSource: DataSource,
+    val projection: List&lt;String&gt;): LogicalPlan {
+
+  val schema = deriveSchema()
+
+  override fun schema(): Schema {
+    return schema
+  }
+
+  private fun deriveSchema() : Schema {
+    val schema = dataSource.schema()
+    if (projection.isEmpty()) {
+      return schema
+    } else {
+      return schema.select(projection)
+    }
+  }
+
+  override fun children(): List&lt;LogicalPlan&gt; {
+    return listOf()
+  }
+
+  override fun toString(): String {
+    return if (projection.isEmpty()) {
+      &quot;Scan: $path; projection=None&quot;
+    } else {
+      &quot;Scan: $path; projection=$projection&quot;
+    }
+  }
+}
+</code></pre>
+<h3 id="projection-映射"><a class="header" href="#projection-映射">Projection 映射</a></h3>
+<p><code>Projection</code> 映射逻辑计划将映射应用于其输入。映射是带输入数据进行求值的表达式的列表。有时，它是一个简单的列的列表，例如，<code>SELECT a, b, c FROM foo</code>。但它也可以包含支持的任何其它类型的表达式。一个更为复杂的例子是 <code>SELECT (CAST(A AS float) * 3.141592) AS my_float FROM foo</code>。</p>
+<pre><code class="language-kotlin">class Projection(
+    val input: LogicalPlan,
+    val expr: List&lt;LogicalExpr&gt;): LogicalPlan {
+  override fun schema(): Schema {
+    return Schema(expr.map { it.toField(input) })
+  }
+
+  override fun children(): List&lt;LogicalPlan&gt; {
+    return listOf(input)
+  }
+
+  override fun toString(): String {
+    return &quot;Projection: ${ expr.map {
+        it.toString() }.joinToString(&quot;, &quot;)
+    }&quot;
+  }
+}
+</code></pre>
+<h3 id="selection-also-known-as-filter-选择也称之为过滤器"><a class="header" href="#selection-also-known-as-filter-选择也称之为过滤器">Selection (also known as Filter) 选择（也称之为过滤器）</a></h3>
+<p><code>Selection</code> 选择逻辑计划应用过滤器表达式来确定应该在其输出中选择（包括）哪些行。这是由 SQL 中的 <code>WHERE</code> 子句来表示的。一个简单的例子是 <code>SELECT * FROM foo WHERE A &gt; 5</code>。过滤器表达式需要求值结果为布尔类型。</p>
+<pre><code class="language-kotlin">class Selection(
+    val input: LogicalPlan,
+    val expr: Expr): LogicalPlan {
+
+  override fun schema(): Schema {
+    // selection does not change the schema of the input
+    return input.schema()
+  }
+
+  override fun children(): List&lt;LogicalPlan&gt; {
+    return listOf(input)
+  }
+
+  override fun toString(): String {
+    return &quot;Filter: $expr&quot;
+  }
+}
+</code></pre>
+<h3 id="aggregate-聚合"><a class="header" href="#aggregate-聚合">Aggregate 聚合</a></h3>
+<p><code>Aggregate</code> 聚合逻辑计划比<code>Projection 映射</code>、<code>Selection 选择</code>或<code>Scan 扫描</code>要复杂得多。它对底层数据进行聚合，例如计算最小值、最大值、平均值和数据求和。聚合通常按照其它列（或表达式）进行分组。一个简单的例子：<code>SELECT job_title, AVG(salary) FROM employee GROUP BY job_title</code> (按照职位求平均薪水)。</p>
+<pre><code class="language-kotlin">class Aggregate(
+    val input: LogicalPlan,
+    val groupExpr: List&lt;LogicalExpr&gt;,
+    val aggregateExpr: List&lt;AggregateExpr&gt;) : LogicalPlan {
+
+  override fun schema(): Schema {
+    return Schema(groupExpr.map { it.toField(input) } +
+         		  aggregateExpr.map { it.toField(input) })
+  }
+
+  override fun children(): List&lt;LogicalPlan&gt; {
+    return listOf(input)
+  }
+
+  override fun toString(): String {
+    return &quot;Aggregate: groupExpr=$groupExpr, aggregateExpr=$aggregateExpr&quot;
+  }
+}
+</code></pre>
+<p>注意，在此实现中，聚合计划的输出使用分组和聚合表达式进行组织。通常需要将聚合逻辑计划封装在映射中，以便按照原始查询中请求的顺序返回列。</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="building-logical-plans-构建逻辑计划"><a class="header" href="#building-logical-plans-构建逻辑计划">Building Logical Plans 构建逻辑计划</a></h1>
+<blockquote>
+<p>本章讨论的源代码可以在 KQuery 项目的 <a href="https://github.com/andygrove/how-query-engines-work/blob/main/jvm/logical-plan">logical-plan</a> 模块中找到。</p>
+</blockquote>
+<h2 id="building-logical-plans-the-hard-way-以复杂方式构建逻辑计划"><a class="header" href="#building-logical-plans-the-hard-way-以复杂方式构建逻辑计划">Building Logical Plans The Hard Way 以复杂方式构建逻辑计划</a></h2>
+<p>既然我们已经为逻辑计划的子集定义了类，那么我们就可以以编程方式区组合它们了。</p>
+<p>针对 CSV 文件中包含的列：<code>id</code>、<code>first_name</code>、<code>last_name</code>、<code>state</code>、<code>job_title</code>、<code>salary</code>，这里有一些具体的代码，用于构建查询计划 <code>SELECT * FROM emplopyee WHERE state = 'co'</code>。</p>
+<pre><code class="language-kotlin">// create a plan to represent the data source
+val csv = CsvDataSource(&quot;employee.csv&quot;)
+
+// create a plan to represent the scan of the data source (FROM)
+val scan = Scan(&quot;employee&quot;, csv, listOf())
+
+// create a plan to represent the selection (WHERE)
+val filterExpr = Eq(Column(&quot;state&quot;), LiteralString(&quot;CO&quot;))
+val selection = Selection(scan, filterExpr)
+
+// create a plan to represent the projection (SELECT)
+val projectionList = listOf(Column(&quot;id&quot;),
+                            Column(&quot;first_name&quot;),
+                            Column(&quot;last_name&quot;),
+                            Column(&quot;state&quot;),
+                            Column(&quot;salary&quot;))
+val plan = Projection(selection, projectionList)
+
+// print the plan
+println(format(plan))
+</code></pre>
+<p>将计划打印输出如下：</p>
+<pre><code>Projection: #id, #first_name, #last_name, #state, #salary
+    Filter: #state = 'CO'
+        Scan: employee; projection=None
+</code></pre>
+<p>同样的代码也可以像这样写得更加简洁：</p>
+<pre><code class="language-kotlin">val plan = Projection(
+  Selection(
+    Scan(&quot;employee&quot;, CsvDataSource(&quot;employee.csv&quot;), listOf()),
+    Eq(Column(3), LiteralString(&quot;CO&quot;))
+  ),
+  listOf(Column(&quot;id&quot;),
+         Column(&quot;first_name&quot;),
+         Column(&quot;last_name&quot;),
+         Column(&quot;state&quot;),
+         Column(&quot;salary&quot;))
+)
+println(format(plan))
+</code></pre>
+<p>虽然这样更加简洁，但也更难解释，所以最好能有一种更优雅的方式来创建逻辑计划。这就是 DataFrame 接口方便的地方。</p>
+<h2 id="building-logical-plans-using-dataframes-使用-dataframes-接口构建逻辑计划"><a class="header" href="#building-logical-plans-using-dataframes-使用-dataframes-接口构建逻辑计划">Building Logical Plans using DataFrames 使用 DataFrames 接口构建逻辑计划</a></h2>
+<p>通过实现 DataFrame 风格的 API 让我们以一种更加用户友好的方式构建逻辑查询计划。DataFrame 只是围绕逻辑查询计划的一个抽象，并具有执行转换和事件的方法。它与 fluent-style 构建器的 API 非常相似。</p>
+<blockquote>
+<p>译者注：可参考 <a href="https://en.wikipedia.org/wiki/Fluent_interface">https://en.wikipedia.org/wiki/Fluent_interface</a></p>
+</blockquote>
+<p>这里是 DataFrame 接口的最小实现，它允许我们将 proijections 映射和 selections 选择应用于一个现有的 DataFrame。</p>
+<pre><code class="language-kotlin">interface DataFrame {
+  /** Apply a projection */
+  fun project(expr: List&lt;LogicalExpr&gt;): DataFrame
+
+  /** Apply a filter */
+  fun filter(expr: LogicalExpr): DataFrame
+
+  /** Aggregate */
+  fun aggregate(groupBy: List&lt;LogicalExpr&gt;,
+                aggregateExpr: List&lt;AggregateExpr&gt;): DataFrame
+
+  /** Returns the schema of the data that will be produced by this DataFrame. */
+  fun schema(): Schema
+
+  /** Get the logical plan */
+  fun logicalPlan() : LogicalPlan
+}
+</code></pre>
+<p>如下是该接口的实现：</p>
+<pre><code class="language-kotlin">class DataFrameImpl(private val plan: LogicalPlan) : DataFrame {
+  override fun project(expr: List&lt;LogicalExpr&gt;): DataFrame {
+    return DataFrameImpl(Projection(plan, expr))
+  }
+
+  override fun filter(expr: LogicalExpr): DataFrame {
+    return DataFrameImpl(Selection(plan, expr))
+  }
+
+  override fun aggregate(groupBy: List&lt;LogicalExpr&gt;,
+                         aggregateExpr: List&lt;AggregateExpr&gt;): DataFrame {
+    return DataFrameImpl(Aggregate(plan, groupBy, aggregateExpr))
+  }
+
+  override fun schema(): Schema {
+    return plan.schema()
+  }
+
+  override fun logicalPlan(): LogicalPlan {
+    return plan
+  }
+}
+</code></pre>
+<p>在我们应用映射或选择之前，我们需要一种方式来表示底层数据源的初始 DataFrame。这通常通过执行上下文来获得。</p>
+<blockquote>
+<p>译者注：即如何从数据源中获取基础数据</p>
+</blockquote>
+<p>如下是执行上下文的一个基础实现，稍后我们将对其进行增强扩展。</p>
+<pre><code class="language-kotlin">class ExecutionContext {
+  fun csv(filename: String): DataFrame {
+    return DataFrameImpl(Scan(filename, CsvDataSource(filename), listOf()))
+  }
+
+  fun parquet(filename: String): DataFrame {
+    return DataFrameImpl(Scan(filename, ParquetDataSource(filename), listOf()))
+  }
+}
+</code></pre>
+<p>有了这项基础工作，我们现在可以使用上下文和 DataFrame API 创建一个逻辑查询计划。</p>
+<pre><code class="language-kotlin">val ctx = ExecutionContext()
+
+val plan = ctx.csv(&quot;employee.csv&quot;)
+              .filter(Eq(Column(&quot;state&quot;), LiteralString(&quot;CO&quot;)))
+              .select(listOf(Column(&quot;id&quot;),
+                             Column(&quot;first_name&quot;),
+                             Column(&quot;last_name&quot;),
+                             Column(&quot;state&quot;),
+                             Column(&quot;salary&quot;)))
+</code></pre>
+<p>这样会更加清晰和只管，但是我们还可以再进一步添加一些简便的方法，使之更易于理解。这是 Kotlin 特有的，不过其它语言也有类似的概念。</p>
+<pre><code class="language-kotlin">infix fun LogicalExpr.eq(rhs: LogicalExpr): LogicalExpr { return Eq(this, rhs) }
+infix fun LogicalExpr.neq(rhs: LogicalExpr): LogicalExpr { return Neq(this, rhs) }
+infix fun LogicalExpr.gt(rhs: LogicalExpr): LogicalExpr { return Gt(this, rhs) }
+infix fun LogicalExpr.gteq(rhs: LogicalExpr): LogicalExpr { return GtEq(this, rhs) }
+infix fun LogicalExpr.lt(rhs: LogicalExpr): LogicalExpr { return Lt(this, rhs) }
+infix fun LogicalExpr.lteq(rhs: LogicalExpr): LogicalExpr { return LtEq(this, rhs) }
+</code></pre>
+<p>有了这些简便的方法，我们现在可以编写表达式代码来构建逻辑查询计划。</p>
+<pre><code class="language-kotlin">val df = ctx.csv(employeeCsv)
+   .filter(col(&quot;state&quot;) eq lit(&quot;CO&quot;))
+   .select(listOf(
+       col(&quot;id&quot;),
+       col(&quot;first_name&quot;),
+       col(&quot;last_name&quot;),
+       col(&quot;salary&quot;),
+       (col(&quot;salary&quot;) mult lit(0.1)) alias &quot;bonus&quot;))
+   .filter(col(&quot;bonus&quot;) gt lit(1000))
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="physical-plan--expressions-物理计划和表达式"><a class="header" href="#physical-plan--expressions-物理计划和表达式">Physical Plan &amp; Expressions 物理计划和表达式</a></h1>
+<blockquote>
+<p>本章讨论的源代码可以在 KQuery 项目的 <a href="https://github.com/andygrove/how-query-engines-work/tree/main/jvm/physical-plan">physical-plan</a> 模块中找到。</p>
+<p>译者注：此处未找到适合 <code>Physical</code> 的表意词，大意指软件逻辑和硬件调度优化设计进行分离。</p>
+</blockquote>
+<p>在第五章中定义的逻辑计划指定了该怎么实现，但是没有阐述如何实现。并且尽管将逻辑和物理计划结合起来可以降低开发复杂度，但将二者分开仍就是一个很好的实践。</p>
+<p>将逻辑和物理计划分开的一个原因是，有事执行特定的操作可能有多种方式，这也意味着逻辑计划和物理计划之间存在着一对多的关系。</p>
+<p>例如，当进程执行与分布式执行，或者 CPU 执行与 GPU 执行之间可能存在单独的物理计划。</p>
+<p>此外，诸如 <code>Aggregate</code> 聚合和 <code>Join</code> 连接之类的操作可以按性能来权衡各种算法进行实现。当聚合数据已经按照 gouping keys 分组键进行排序的时候，使用 Group Aggregate（也称之为软聚合）是行之有效的，它一次只需要保存一组分组键的状态，并可以在一组分组键结束的时候立即发出结果。而如果是未经排序的数据，则往往使用 Hash 聚合。Hash 聚合通过对键进行分组来维护累加器的 HashMap。</p>
+<p>连接的算法实现则更为宽泛，包括嵌套循环连接、排序合并连接和 Hash 连接。</p>
+<p>物理计划返回 <code>RecordBatch</code> 类型的迭代器。</p>
+<pre><code class="language-kotlin">interface PhysicalPlan {
+  fun schema(): Schema
+  fun execute(): Sequence&lt;RecordBatch&gt;
+  fun children(): List&lt;PhysicalPlan&gt;
+}
+</code></pre>
+<h2 id="physical-expressions-物理表达式"><a class="header" href="#physical-expressions-物理表达式">Physical Expressions 物理表达式</a></h2>
+<p>我们已经定义了在逻辑计划中应用的逻辑表达式，但是我们现在需要实现包含代码的物理表达式类，以计算运行时的表达式。</p>
+<p>每个逻辑表达式可以由多个物理表达式实现。例如，对将两个数字相加的逻辑表达式 <code>AddExpr</code>，我们可以分别由 CPU 和 GPU 进行实现。查询规划器可以根据运行代码所在服务器的硬件能力选择使用哪个实现。</p>
+<p>物理表达式针对 <code>RecordBatch</code> 进行求值，并且求值结果为 <code>ColumnVector</code>。</p>
+<p>这是我们将用来表示物理表达式的接口：</p>
+<pre><code class="language-kotlin">interface Expression {
+  fun evaluate(input: RecordBatch): ColumnVector
+}
+</code></pre>
+<h3 id="column-expressions-列表达式"><a class="header" href="#column-expressions-列表达式">Column Expressions 列表达式</a></h3>
+<p>列表达式只需要对正在处理的 <code>RecordBatch</code> 进行简单的计算并返回 <code>ColumnVector</code> 引用。逻辑表达式中按名称引用 <code>Column</code>，这对于编写查询语句的用户来说是非常友好的，但是对于物理表达式而言，我们希望避免每次计算表达式都要花费在名称查找上的开销，因此将它改为按序号引用 <code>(val i: Int)</code>。</p>
+<pre><code class="language-kotlin">class ColumnExpression(val i: Int) : Expression {
+
+  override fun evaluate(input: RecordBatch): ColumnVector {
+    return input.field(i)
+  }
+
+  override fun toString(): String {
+    return &quot;#$i&quot;
+  }
+}
+</code></pre>
+<h3 id="literal-expressions-字面值表达式"><a class="header" href="#literal-expressions-字面值表达式">Literal Expressions 字面值表达式</a></h3>
+<p>物理上实现一个字面值表达式实质上只是简单地将一个字面值包装在类中，并且该类实现了适当的 trait，并为列中每个索引提供相同的值。</p>
+<blockquote>
+<p>译者注：Traits 特征，此概念可参考 <a href="https://doc.rust-lang.org/reference/items/traits.html">Rust 语言</a>，理解为一种抽象接口 interface。</p>
+</blockquote>
+<pre><code class="language-kotlin">class LiteralValueVector(
+    val arrowType: ArrowType,
+    val value: Any?,
+    val size: Int) : ColumnVector {
+
+  override fun getType(): ArrowType {
+    return arrowType
+  }
+
+  override fun getValue(i: Int): Any? {
+    if (i&lt;0 || i&gt;=size) {
+      throw IndexOutOfBoundsException()
+    }
+    return value
+  }
+
+  override fun size(): Int {
+    return size
+  }
+}
+</code></pre>
+<p>有了这个类，我们就可以为每种数据类型的字面值表达式创建物理表达式了。</p>
+<pre><code class="language-kotlin">class LiteralLongExpression(val value: Long) : Expression {
+  override fun evaluate(input: RecordBatch): ColumnVector {
+    return LiteralValueVector(ArrowTypes.Int64Type,
+                              value,
+                              input.rowCount())
+  }
+}
+
+class LiteralDoubleExpression(val value: Double) : Expression {
+  override fun evaluate(input: RecordBatch): ColumnVector {
+    return LiteralValueVector(ArrowTypes.DoubleType,
+                              value,
+                              input.rowCount())
+  }
+}
+
+class LiteralStringExpression(val value: String) : Expression {
+  override fun evaluate(input: RecordBatch): ColumnVector {
+    return LiteralValueVector(ArrowTypes.StringType,
+                              value.toByteArray(),
+                              input.rowCount())
+  }
+}
+</code></pre>
+<h3 id="binary-expressions-二元表达式-1"><a class="header" href="#binary-expressions-二元表达式-1">Binary Expressions 二元表达式</a></h3>
+<p>对于二元表达式，我们需要计算左右输入表达式，然后根据这些输入计算特定的二元运算符，这样我们就可以提供一个基类来简化每个运算符的实现。</p>
+<pre><code class="language-kotlin">abstract class BinaryExpression(val l: Expression, val r: Expression) : Expression {
+  override fun evaluate(input: RecordBatch): ColumnVector {
+    val ll = l.evaluate(input)
+    val rr = r.evaluate(input)
+    assert(ll.size() == rr.size())
+    if (ll.getType() != rr.getType()) {
+      throw IllegalStateException(
+          &quot;Binary expression operands do not have the same type: &quot; +
+          &quot;${ll.getType()} != ${rr.getType()}&quot;)
+    }
+    return evaluate(ll, rr)
+  }
+
+  abstract fun evaluate(l: ColumnVector, r: ColumnVector) : ColumnVector
+}
+</code></pre>
+<h3 id="comparison-expressions-比较表达式-1"><a class="header" href="#comparison-expressions-比较表达式-1">Comparison Expressions 比较表达式</a></h3>
+<p>比较表达式只是比较两个输入列中的所有值，并产生一个结果的新列（位向量）。</p>
+<p>这里有一个等价运算符的例子：</p>
+<pre><code class="language-kotlin">class EqExpression(l: Expression,
+                   r: Expression): BooleanExpression(l,r) {
+
+  override fun evaluate(l: Any?, r: Any?, arrowType: ArrowType) : Boolean {
+    return when (arrowType) {
+      ArrowTypes.Int8Type -&gt; (l as Byte) == (r as Byte)
+      ArrowTypes.Int16Type -&gt; (l as Short) == (r as Short)
+      ArrowTypes.Int32Type -&gt; (l as Int) == (r as Int)
+      ArrowTypes.Int64Type -&gt; (l as Long) == (r as Long)
+      ArrowTypes.FloatType -&gt; (l as Float) == (r as Float)
+      ArrowTypes.DoubleType -&gt; (l as Double) == (r as Double)
+      ArrowTypes.StringType -&gt; toString(l) == toString(r)
+      else -&gt; throw IllegalStateException(
+          &quot;Unsupported data type in comparison expression: $arrowType&quot;)
+    }
+  }
+}
+</code></pre>
+<h3 id="math-expressions数学表达式"><a class="header" href="#math-expressions数学表达式">Math Expressions数学表达式</a></h3>
+<p>数学表达式的实现与比较表达式的代码非常类似。一个基类可以用于所有数学表达式。</p>
+<pre><code class="language-kotlin">abstract class MathExpression(l: Expression,
+                              r: Expression): BinaryExpression(l,r) {
+
+  override fun evaluate(l: ColumnVector, r: ColumnVector): ColumnVector {
+    val fieldVector = FieldVectorFactory.create(l.getType(), l.size())
+    val builder = ArrowVectorBuilder(fieldVector)
+    (0 until l.size()).forEach {
+      val value = evaluate(l.getValue(it), r.getValue(it), l.getType())
+      builder.set(it, value)
+    }
+    builder.setValueCount(l.size())
+    return builder.build()
+  }
+
+  abstract fun evaluate(l: Any?, r: Any?, arrowType: ArrowType) : Any?
+}
+</code></pre>
+<p>下面是扩展此基类的一个特定数学表达式示例：</p>
+<pre><code class="language-kotlin">class AddExpression(l: Expression,
+                    r: Expression): MathExpression(l,r) {
+
+  override fun evaluate(l: Any?, r: Any?, arrowType: ArrowType) : Any? {
+      return when (arrowType) {
+        ArrowTypes.Int8Type -&gt; (l as Byte) + (r as Byte)
+        ArrowTypes.Int16Type -&gt; (l as Short) + (r as Short)
+        ArrowTypes.Int32Type -&gt; (l as Int) + (r as Int)
+        ArrowTypes.Int64Type -&gt; (l as Long) + (r as Long)
+        ArrowTypes.FloatType -&gt; (l as Float) + (r as Float)
+        ArrowTypes.DoubleType -&gt; (l as Double) + (r as Double)
+        else -&gt; throw IllegalStateException(
+            &quot;Unsupported data type in math expression: $arrowType&quot;)
+      }
+  }
+
+  override fun toString(): String {
+    return &quot;$l+$r&quot;
+  }
+}
+</code></pre>
+<h3 id="aggregate-expressions-聚合表达式-1"><a class="header" href="#aggregate-expressions-聚合表达式-1">Aggregate Expressions 聚合表达式</a></h3>
+<p>到目前为止，我们看到的表达式都是通过每个 batch 中的一个或多个输入列产生一个输出列。而聚合表达式的情况则更为复杂，因为它们跨多个批量记录数据进行聚合，然后产生一个最终值，因此我们需要引入 accumulator 累加器的概念，并且每个聚合表达式的物理表示需要知道如何为查询引擎传入输入数据的累加器。</p>
+<p>下面是表示聚合表达式和累加器的主要接口：</p>
+<pre><code class="language-kotlin">interface AggregateExpression {
+  fun inputExpression(): Expression
+  fun createAccumulator(): Accumulator
+}
+
+interface Accumulator {
+  fun accumulate(value: Any?)
+  fun finalValue(): Any?
+}
+</code></pre>
+<p><code>Max</code> 聚合表达式的实现将生成一个特定的 MaxAccumulator。</p>
+<pre><code class="language-kotlin">class MaxExpression(private val expr: Expression) : AggregateExpression {
+
+  override fun inputExpression(): Expression {
+    return expr
+  }
+
+  override fun createAccumulator(): Accumulator {
+    return MaxAccumulator()
+  }
+
+  override fun toString(): String {
+    return &quot;MAX($expr)&quot;
+  }
+}
+</code></pre>
+<p>下面是 MaxAccumulator 的一个示例实现：</p>
+<pre><code class="language-kotlin">class MaxAccumulator : Accumulator {
+
+  var value: Any? = null
+
+  override fun accumulate(value: Any?) {
+    if (value != null) {
+      if (this.value == null) {
+        this.value = value
+      } else {
+        val isMax = when (value) {
+          is Byte -&gt; value &gt; this.value as Byte
+          is Short -&gt; value &gt; this.value as Short
+          is Int -&gt; value &gt; this.value as Int
+          is Long -&gt; value &gt; this.value as Long
+          is Float -&gt; value &gt; this.value as Float
+          is Double -&gt; value &gt; this.value as Double
+          is String -&gt; value &gt; this.value as String
+          else -&gt; throw UnsupportedOperationException(
+            &quot;MAX is not implemented for data type: ${value.javaClass.name}&quot;)
+        }
+
+        if (isMax) {
+          this.value = value
+        }
+      }
+    }
+  }
+
+  override fun finalValue(): Any? {
+    return value
+  }
+}
+</code></pre>
+<h2 id="physical-plans-物理计划"><a class="header" href="#physical-plans-物理计划">Physical Plans 物理计划</a></h2>
+<p>有了物理表达式，我们现在可以为查询引擎将要支持的各种转换实现物理计划。</p>
+<h3 id="scan-扫描-1"><a class="header" href="#scan-扫描-1">Scan 扫描</a></h3>
+<p><code>Scan</code> 扫描执行计划只需要委托给数据源，并传入映射来限制要加载到内存中的列数量。不执行任何附加逻辑。</p>
+<pre><code class="language-kotlin">class ScanExec(val ds: DataSource, val projection: List&lt;String&gt;) : PhysicalPlan {
+
+  override fun schema(): Schema {
+    return ds.schema().select(projection)
+  }
+
+  override fun children(): List&lt;PhysicalPlan&gt; {
+    // Scan is a leaf node and has no child plans
+    return listOf()
+  }
+
+  override fun execute(): Sequence&lt;RecordBatch&gt; {
+    return ds.scan(projection);
+  }
+
+  override fun toString(): String {
+    return &quot;ScanExec: schema=${schema()}, projection=$projection&quot;
+  }
+}
+</code></pre>
+<h3 id="projection-映射-1"><a class="header" href="#projection-映射-1">Projection 映射</a></h3>
+<p><code>Projection</code> 映射执行计划只需要根据输入的列计算映射表达式，然后生成包含派生列的批量记录。注意，对于按名称引用现有列的映射表达式，派生列只是一个只想输入列的指针或引用，因此不会复制底层数据值。</p>
+<pre><code class="language-kotlin">class ProjectionExec(
+    val input: PhysicalPlan,
+    val schema: Schema,
+    val expr: List&lt;Expression&gt;) : PhysicalPlan {
+
+  override fun schema(): Schema {
+    return schema
+  }
+
+  override fun children(): List&lt;PhysicalPlan&gt; {
+    return listOf(input)
+  }
+
+  override fun execute(): Sequence&lt;RecordBatch&gt; {
+    return input.execute().map { batch -&gt;
+      val columns = expr.map { it.evaluate(batch) }
+        RecordBatch(schema, columns)
+      }
+  }
+
+  override fun toString(): String {
+    return &quot;ProjectionExec: $expr&quot;
+  }
+}
+</code></pre>
+<h3 id="selection-as-known-as-filter-选择也称之为过滤器"><a class="header" href="#selection-as-known-as-filter-选择也称之为过滤器">Selection (as known as Filter) 选择（也称之为过滤器）</a></h3>
+<p><code>Selection</code> 选择执行计划是第一个重要的计划，因为它有具有条件逻辑，可以确定输入批量记录中的哪些行应该被包含在输出批量数据中。</p>
+<p>对于每个输入批量数据，过滤器表达式会计算并返回一个位向量，其中包含表示表达式布尔结果的位，每行对应一位。然后使用该位向量过滤输入列以产生新的输出列。这是一个简单实现，可以针对维向量包含位为全 1 或全 0 的情况进行优化，以避免将无关数据复制到新向量所产生的额外开销。</p>
+<blockquote>
+<p>译者注：Apache Arrow 的 Validity Bitmap Buffer 设计思想的简化实现。</p>
+</blockquote>
+<pre><code class="language-kotlin">class SelectionExec(
+    val input: PhysicalPlan,
+    val expr: Expression) : PhysicalPlan {
+  override fun schema(): Schema {
+    return input.schema()
+  }
+
+  override fun children(): List&lt;PhysicalPlan&gt; {
+    return listOf(input)
+  }
+
+  override fun execute(): Sequence&lt;RecordBatch&gt; {
+    val input = input.execute()
+    return input.map { batch -&gt;
+      val result = (expr.evaluate(batch) as ArrowFieldVector).field as BitVector
+      val schema = batch.schema
+      val columnCount = batch.schema.fields.size
+      val filteredFields = (0 until columnCount).map {
+          filter(batch.field(it), result)
+      }
+      val fields = filteredFields.map { ArrowFieldVector(it) }
+      RecordBatch(schema, fields)
+    }
+
+  private fun filter(v: ColumnVector, selection: BitVector) : FieldVector {
+    val filteredVector = VarCharVector(&quot;v&quot;, RootAllocator(Long.MAX_VALUE))
+    filteredVector.allocateNew()
+
+    val builder = ArrowVectorBuilder(filteredVector)
+
+    var count = 0
+    (0 until selection.valueCount).forEach {
+      if (selection.get(it) == 1) {
+        builder.set(count, v.getValue(it))
+        count++
+      }
+    }
+    filteredVector.valueCount = count
+    return filteredVector
+  }
+}
+</code></pre>
+<h3 id="hash-aggregate-hash-聚合"><a class="header" href="#hash-aggregate-hash-聚合">Hash Aggregate Hash 聚合</a></h3>
+<p><code>Hash</code> 聚合计划比之前的计划要复杂得多，因为它必须处理所有输入批量数据，维护累加器的 HashMap，并为正在处理的没一行数据更新累加器。组以后，使用累加器的结果在末尾创建一个批量数据记录，其中包含了聚合查询的结果。</p>
+<pre><code class="language-kotlin">class HashAggregateExec(
+    val input: PhysicalPlan,
+    val groupExpr: List&lt;Expression&gt;,
+    val aggregateExpr: List&lt;AggregateExpression&gt;,
+    val schema: Schema
+) : PhysicalPlan {
+  override fun schema(): Schema {
+    return schema
+  }
+
+  override fun children(): List&lt;PhysicalPlan&gt; {
+    return listOf(input)
+  }
+
+  override fun toString(): String {
+    return &quot;HashAggregateExec: groupExpr=$groupExpr, aggrExpr=$aggregateExpr&quot;
+  }
+
+  override fun execute(): Sequence&lt;RecordBatch&gt; {
+    val map = HashMap&lt;List&lt;Any?&gt;, List&lt;Accumulator&gt;&gt;()
+
+    // for each batch from the input executor
+    input.execute().iterator().forEach { batch -&gt;
+
+      // evaluate the grouping expressions
+      val groupKeys = groupExpr.map { it.evaluate(batch) }
+
+      // evaluate the expressions that are inputs to the aggregate functions
+      val aggrInputValues = aggregateExpr.map { 
+        it.inputExpression().evaluate(batch) 
+      }
+
+      // for each row in the batch
+      (0 until batch.rowCount()).forEach { rowIndex -&gt;
+
+        // create the key for the hash map
+        val rowKey =
+            groupKeys.map {
+              val value = it.getValue(rowIndex)
+              when (value) {
+                is ByteArray -&gt; String(value)
+                else -&gt; value
+              }
+            }
+
+        // println(rowKey)
+
+        // get or create accumulators for this grouping key
+        val accumulators = map.getOrPut(rowKey) { aggregateExpr.map { it.createAccumulator() } }
+
+        // perform accumulation
+        accumulators.withIndex().forEach { accum -&gt;
+          val value = aggrInputValues[accum.index].getValue(rowIndex)
+          accum.value.accumulate(value)
+        }
+      }
+    }
+
+    // create result batch containing final aggregate values
+    val root = VectorSchemaRoot.create(schema.toArrow(), RootAllocator(Long.MAX_VALUE))
+    root.allocateNew()
+    root.rowCount = map.size
+
+    val builders = root.fieldVectors.map { ArrowVectorBuilder(it) }
+
+    map.entries.withIndex().forEach { entry -&gt;
+      val rowIndex = entry.index
+      val groupingKey = entry.value.key
+      val accumulators = entry.value.value
+      groupExpr.indices.forEach { builders[it].set(rowIndex, groupingKey[it]) }
+      aggregateExpr.indices.forEach {
+        builders[groupExpr.size + it].set(rowIndex, accumulators[it].finalValue())
+      }
+    }
+
+    val outputBatch = RecordBatch(schema, root.fieldVectors.map { ArrowFieldVector(it) })
+
+    // println(&quot;HashAggregateExec output:\n${outputBatch.toCSV()}&quot;)
+    return listOf(outputBatch).asSequence()
+  }
+}
+</code></pre>
+<h3 id="joins-连接"><a class="header" href="#joins-连接">Joins 连接</a></h3>
+<p>顾名思义，<code>Join</code> 运算符用于连接两个相关行。有许多不同类型的连接，伴随着不同的语义。</p>
+<ul>
+<li><code>[INNER] JOIN</code>: 这是最常用的连接类型，它创建了一个包含左右输入行的新关系。如果连接表达式只包含左右输入列之间的等值比较，则这种连接被称为 &quot;equi-join 等值连接&quot;。例如： <code>SELECT * FROM customer JOIN orders ON customer.id = order.customer_id</code>。</li>
+<li><code>LEFT [OUTER] JOIN</code>: 左外连接产生的行包含来自左输入的所有值，以及来自右输入的可选行。若右侧没有匹配的结果，则为右侧列生成空值。</li>
+<li><code>RIGHT [OUTER] JOIN</code>: 与左连接操作相反。从右边开始的所有行和左边开始的可用行一起返回。</li>
+<li><code>SEMI JOIN</code>: 半连接类似于左连接，但它只返回左输入中与右输入匹配的行。右输入没有数据返回。并不是所有的 SQL 实现都显式地支持半连接，它们通常被写成子查询语句。例如：<code>FROM foo WHERE EXISTS (SELECT * FROM bar WHERE foo.id = bar.id)</code>。</li>
+<li><code>ANTI JOIN</code>: 反连接与半连接相反。它只返回与右输入匹配的左输入中的行。例如：<code>SELECT id FROM foo WHERE NOT EXISTS (SELECT * FROM bar WHERE foo.id = bar.id)</code>。</li>
+<li><code>CROSS JOIN</code>: 交叉连接返回来自左右输入的所有可能的组合行，如果左输入包含 100 行，右输入包含 200 行，则将返回 20,000 行。这被称为笛卡尔积。</li>
+</ul>
+<p>KQuery 还没有实现连接操作符。</p>
+<h3 id="subqueries-子查询"><a class="header" href="#subqueries-子查询">Subqueries 子查询</a></h3>
+<p>子查询是查询中的查询。它们可以相关也可以非相关（取决于是否涉及到其它关系的连接）。当子查询返回单个值时，它被称为标量子查询。</p>
+<h3 id="scalar-subqueries-标量子查询"><a class="header" href="#scalar-subqueries-标量子查询">Scalar subqueries 标量子查询</a></h3>
+<p>标量子查询返回单个值，可以在许多可以使用字面值的 SQL 表达式中使用。</p>
+<p>下面是一个相关标量子查询的示例：</p>
+<pre><code class="language-SQL">SELECT id, name, (SELECT count(*) FROM orders WHERE customer_id = customer.id) AS num_orders FROM customers;
+</code></pre>
+<p>下面是一个非相关标量子查询的示例：</p>
+<pre><code class="language-SQL">SELECT * FROM orders WHERE total &gt; (SELECT avg(total) FROM sales WHERE customer_state = 'CA');
+</code></pre>
+<p>相关子查询在执行之前被转换为连接（这将在第 10 章中解释）。</p>
+<p>不相关的查询可以单独执行，结果值可以替换到顶级查询中。</p>
+<h3 id="exists-和-in-子查询"><a class="header" href="#exists-和-in-子查询">EXISTS 和 IN 子查询</a></h3>
+<p><code>EXISTS</code> 和 <code>IN</code> 表达式（以及它们的否定形式 <code>NOT EXISTS</code> 和 <code>NOT IN</code>）可用于创建半连接和反连接。</p>
+<p>如下是一个半连接的示例，它从子查询返回匹配行的左关联 (foo) 中选择所有行。</p>
+<pre><code class="language-SQL">SELECT id FROM foo WHERE EXISTS (SELECT * FROM bar WHERE foo.id = bar.id);
+</code></pre>
+<p>关联子查询通常在逻辑计划优化期间转换为连接（这将在第 10 章中解释）。</p>
+<p>KQuery 也还没有实现子查询。</p>
+<h2 id="creating-physical-plans-创建物理计划"><a class="header" href="#creating-physical-plans-创建物理计划">Creating Physical Plans 创建物理计划</a></h2>
+<p>物理计划就绪后，下一步是构建一个查询规划器，以便从逻辑计划中创建物理计划，这将在下一章中介绍。</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="query-planner-查询规划器"><a class="header" href="#query-planner-查询规划器">Query Planner 查询规划器</a></h1>
+<blockquote>
+<p>本章讨论的源代码可以在 KQuery 项目的 <a href="https://github.com/andygrove/how-query-engines-work/tree/main/jvm/query-planner">query-planner</a> 模块中找到。</p>
+</blockquote>
+<p>我们已经定义了逻辑和物理查询计划，现在我们需要一个可以将逻辑计划转换为物理计划的查询规划器。</p>
+<p>查询规划器可以根据配置选项或者目标平台的硬件功能选择不同的物理计划。例如，查询可以在 CPU 或 GPU 上执行，也可以在单个节点上执行，或者分布在集群中。</p>
+<h2 id="translating-logical-expressions-翻译逻辑表达式"><a class="header" href="#translating-logical-expressions-翻译逻辑表达式">Translating Logical Expressions 翻译逻辑表达式</a></h2>
+<p>第一步是定义一个递归地将逻辑表达式翻译成物理表达式的方法。下面地代码示例演示了一个基于 switch 语句的实现，并展示了如何翻译一个二元表达式（它有两个输入表达式），从而使代码递归回到同一个方法来翻译这些输入。这种方法遍历整个逻辑表达式树并创建相应的物理表达式树。</p>
+<pre><code class="language-kotlin">fun createPhysicalExpr(expr: LogicalExpr,
+                       input: LogicalPlan): PhysicalExpr = when (expr) {
+  is ColumnIndex -&gt; ColumnExpression(expr.i)
+  is LiteralString -&gt; LiteralStringExpression(expr.str)
+  is BinaryExpr -&gt; {
+    val l = createPhysicalExpr(expr.l, input)
+    val r = createPhysicalExpr(expr.r, input)
+    ...
+  }
+  ...
+}
+</code></pre>
+<p>下面几节将解释每种类型表达式的实现。</p>
+<h3 id="column-expressions-列表达式-1"><a class="header" href="#column-expressions-列表达式-1">Column Expressions 列表达式</a></h3>
+<p>逻辑列表达式按名称引用列，但物理表达式使用列索引以提高性能，因此在查询规划器需要执行从列名到列索引的转换，并在列名无效时抛出异常。</p>
+<p>下面这个简化的示例按第一个列名进行查找，而并没有监测是否有多个匹配列，这应该是个错误的条件。</p>
+<pre><code class="language-kotlin">is Column -&gt; {
+  val i = input.schema().fields.indexOfFirst { it.name == expr.name }
+  if (i == -1) {
+    throw SQLException(&quot;No column named '${expr.name}'&quot;)
+  }
+  ColumnExpression(i)
+</code></pre>
+<h3 id="literal-expressions-字面表达式"><a class="header" href="#literal-expressions-字面表达式">Literal Expressions 字面表达式</a></h3>
+<p>字面值的物理表达式是非常直观的，并且从逻辑到物理表达式的映射也很简单，因为我们只需要拷贝字面值即可。</p>
+<pre><code class="language-kotlin">is LiteralLong -&gt; LiteralLongExpression(expr.n)
+is LiteralDouble -&gt; LiteralDoubleExpression(expr.n)
+is LiteralString -&gt; LiteralStringExpression(expr.str)
+</code></pre>
+<h3 id="binary-expressions-二元表达式-2"><a class="header" href="#binary-expressions-二元表达式-2">Binary Expressions 二元表达式</a></h3>
+<p>要为二元表达式创建物理表达式，我们首先需要为左右输入创建物理表达式，然后我们再创建特定的物理表达式。</p>
+<pre><code class="language-kotlin">is BinaryExpr -&gt; {
+  val l = createPhysicalExpr(expr.l, input)
+  val r = createPhysicalExpr(expr.r, input)
+  when (expr) {
+    // comparision
+    is Eq -&gt; EqExpression(l, r)
+    is Neq -&gt; NeqExpression(l, r)
+    is Gt -&gt; GtExpression(l, r)
+    is GtEq -&gt; GtEqExpression(l, r)
+    is Lt -&gt; LtExpression(l, r)
+    is LtEq -&gt; LtEqExpression(l, r)
+
+    // boolean
+    is And -&gt; AndExpression(l, r)
+    is Or -&gt; OrExpression(l, r)
+
+    // math
+    is Add -&gt; AddExpression(l, r)
+    is Subtract -&gt; SubtractExpression(l, r)
+    is Multiply -&gt; MultiplyExpression(l, r)
+    is Divide -&gt; DivideExpression(l, r)
+
+    else -&gt; throw IllegalStateException(
+        &quot;Unsupported binary expression: $expr&quot;)
+    }
+}
+</code></pre>
+<h2 id="translating-logical-plans-翻译逻辑计划"><a class="header" href="#translating-logical-plans-翻译逻辑计划">Translating Logical Plans 翻译逻辑计划</a></h2>
+<p>我们需要实现一个递归方法以遍历逻辑计划树，并将其转换为物理计划树，使用与去前面转换表达式相同的模式。</p>
+<pre><code class="language-kotlin">fun createPhysicalPlan(plan: LogicalPlan) : PhysicalPlan {
+  return when (plan) {
+    is Scan -&gt; ...
+    is Selection -&gt; ...
+    ...
+}
+</code></pre>
+<h3 id="scan-扫描-2"><a class="header" href="#scan-扫描-2">Scan 扫描</a></h3>
+<p>翻译 <code>Scan</code> 扫描计划只需要复制数据源引用和逻辑计划的映射。</p>
+<pre><code class="language-kotlin">is Scan -&gt; ScanExec(plan.dataSource, plan.projection)
+</code></pre>
+<h3 id="projection-映射-2"><a class="header" href="#projection-映射-2">Projection 映射</a></h3>
+<p>翻译一个映射有两步。首先，我们需要为映射的输入创建一个物理计划，然后我们需要将映射的逻辑表达式转换为物理表达式。</p>
+<pre><code class="language-kotlin">is Projection -&gt; {
+  val input = createPhysicalPlan(plan.input)
+  val projectionExpr = plan.expr.map { createPhysicalExpr(it, plan.input) }
+  val projectionSchema = Schema(plan.expr.map { it.toField(plan.input) })
+  ProjectionExec(input, projectionSchema, projectionExpr)
+}
+</code></pre>
+<h3 id="selection-also-known-as-filter-选择也称之为过滤器-1"><a class="header" href="#selection-also-known-as-filter-选择也称之为过滤器-1">Selection (also known as Filter) 选择（也称之为过滤器）</a></h3>
+<p>查询计划中 <code>Selection</code> 选择的翻译步骤与 <code>Projection</code> 映射非常相似。</p>
+<pre><code class="language-kotlin">is Selection -&gt; {
+  val input = createPhysicalPlan(plan.input)
+  val filterExpr = createPhysicalExpr(plan.expr, plan.input)
+  SelectionExec(input, filterExpr)
+}
+</code></pre>
+<h3 id="aggregate-聚合-1"><a class="header" href="#aggregate-聚合-1">Aggregate 聚合</a></h3>
+<p>聚合查询的查询规划步骤包括计算可选分组键的表达式和聚合函数的输入表达式，然后创建物理聚合表达式。</p>
+<pre><code class="language-kotlin">is Aggregate -&gt; {
+  val input = createPhysicalPlan(plan.input)
+  val groupExpr = plan.groupExpr.map { createPhysicalExpr(it, plan.input) }
+  val aggregateExpr = plan.aggregateExpr.map {
+    when (it) {
+      is Max -&gt; MaxExpression(createPhysicalExpr(it.expr, plan.input))
+      is Min -&gt; MinExpression(createPhysicalExpr(it.expr, plan.input))
+      is Sum -&gt; SumExpression(createPhysicalExpr(it.expr, plan.input))
+      else -&gt; throw java.lang.IllegalStateException(
+          &quot;Unsupported aggregate function: $it&quot;)
+    }
+  }
+  HashAggregateExec(input, groupExpr, aggregateExpr, plan.schema())
+}
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="query-optimizations-请求优化器"><a class="header" href="#query-optimizations-请求优化器">Query Optimizations 请求优化器</a></h1>
+<blockquote>
+<p>本章讨论的源代码可以在 KQuery 项目的 <a href="https://github.com/andygrove/how-query-engines-work/tree/main/jvm/optimizer">optimizer</a> 模块中找到。</p>
+</blockquote>
+<p>我们现在有了功能性查询计划，但是我们有赖于终端用户能够以一种有效的方式构造计划。例如，我们希望用户在构建计划的时候能够尽早的使用过滤器，特别是在连接操作之前，因为这样可以限制需要处理的数据量。</p>
+<p>是时候来实现一个简单的基于规则的优化器了，它可以重新安排查询计划以提高其效率。</p>
+<p>一旦我们在第 11 章中开始支持 SQL，这将变得更加重要，因为 SQL 语言只定义查询应该如何工作，并不总是允许用户去指定运算符和表达式的求值顺序。</p>
+<h2 id="rule-based-optimizations-基于规则的优化器"><a class="header" href="#rule-based-optimizations-基于规则的优化器">Rule-Based Optimizations 基于规则的优化器</a></h2>
+<p>基于规则进行优化是一种简单而实用的方法。尽管基于规则的优化器也可以应用于物理计划，但是这些优化器通常在创建物理计划之前针对逻辑计划执行。</p>
+<p>优化器的工作方式是使用访问者模式遍历逻辑计划，创建计划中每个步骤的副本并应用必要的修改。这事一种比在执行计划时视图改变状态要简单得多的涉及，并且倾向于不可变状态的函数式编程风格。</p>
+<p>我们将会使用下面这些接口来表示优化器规则。</p>
+<pre><code class="language-kotlin">interface OptimizerRule {
+  fun optimize(plan: LogicalPlan) : LogicalPlan
+}
+</code></pre>
+<p>现在，我们将研究大多数查询引擎实施的一些常见的优化规则。</p>
+<h3 id="projection-push-down-映射下推"><a class="header" href="#projection-push-down-映射下推">Projection Push-Down 映射下推</a></h3>
+<blockquote>
+<p>译者注：如根据表达式自动提前构建所需的映射关联表。</p>
+</blockquote>
+<p>映射下推的目标是在从磁盘读取数据之后和其它查询阶段之前尽快过滤掉列数据，以减少各操作之间保存在内存中的数据量（并且在分布式查询的情况下可能通过网络传输）。</p>
+<p>为了知道查询中引用了哪些列，我们必须编写递归代码以检查表达式并构建列数据列表。</p>
+<pre><code class="language-kotlin">fun extractColumns(expr: List&lt;LogicalExpr&gt;,
+                   input: LogicalPlan,
+                   accum: MutableSet&lt;String&gt;) {
+
+  expr.forEach { extractColumns(it, input, accum) }
+}
+
+fun extractColumns(expr: LogicalExpr,
+                   input: LogicalPlan,
+                   accum: MutableSet&lt;String&gt;) {
+
+  when (expr) {
+    is ColumnIndex -&gt; accum.add(input.schema().fields[expr.i].name)
+    is Column -&gt; accum.add(expr.name)
+    is BinaryExpr -&gt; {
+       extractColumns(expr.l, input, accum)
+       extractColumns(expr.r, input, accum)
+    }
+    is Alias -&gt; extractColumns(expr.expr, input, accum)
+    is CastExpr -&gt; extractColumns(expr.expr, input, accum)
+    is LiteralString -&gt; {}
+    is LiteralLong -&gt; {}
+    is LiteralDouble -&gt; {}
+    else -&gt; throw IllegalStateException(
+        &quot;extractColumns does not support expression: $expr&quot;)
+  }
+}
+</code></pre>
+<p>有了这段实用的代码，我们就可以继续优化器规则了。注意，对于 <code>Projection</code> 映射、<code>Selection</code> 选择和 <code>Aggregate</code> 聚合计划，我们正在构建列名称列表，但是当我们遇到 <code>Scan</code> 扫描（它是一个叶节点）的时候，我们将其替换为查询的列名称列表中的版本。</p>
+<pre><code class="language-kotlin">class ProjectionPushDownRule : OptimizerRule {
+  override fun optimize(plan: LogicalPlan): LogicalPlan {
+    return pushDown(plan, mutableSetOf())
+  }
+
+  private fun pushDown(plan: LogicalPlan,
+                       columnNames: MutableSet&lt;String&gt;): LogicalPlan {
+    return when (plan) {
+      is Projection -&gt; {
+        extractColumns(plan.expr, columnNames)
+        val input = pushDown(plan.input, columnNames)
+        Projection(input, plan.expr)
+      }
+      is Selection -&gt; {
+        extractColumns(plan.expr, columnNames)
+        val input = pushDown(plan.input, columnNames)
+        Selection(input, plan.expr)
+      }
+      is Aggregate -&gt; {
+        extractColumns(plan.groupExpr, columnNames)
+        extractColumns(plan.aggregateExpr.map { it.inputExpr() }, columnNames)
+        val input = pushDown(plan.input, columnNames)
+        Aggregate(input, plan.groupExpr, plan.aggregateExpr)
+      }
+      is Scan -&gt; Scan(plan.name, plan.dataSource, columnNames.toList().sorted())
+      else -&gt; throw new UnsupportedOperationException()
+    }
+  }
+}
+</code></pre>
+<p>给定的输入逻辑计划为：</p>
+<pre><code class="language-SQL">Projection: #id, #first_name, #last_name
+  Filter: #state = 'CO'
+    Scan: employee; projection=None
+</code></pre>
+<p>此优化器规则将其转换为如下计划：</p>
+<pre><code class="language-SQL">Projection: #id, #first_name, #last_name
+  Filter: #state = 'CO'
+    Scan: employee; projection=[first_name, id, last_name, state]
+</code></pre>
+<h3 id="predicate-push-down-谓词下推"><a class="header" href="#predicate-push-down-谓词下推">Predicate Push-Down 谓词下推</a></h3>
+<p>谓词下推优化的目的是为了在查询中尽早地过滤掉行，以避免冗余处理。考虑下面的例子，它连接一个 employee 表和 dept 表，然后过滤位于 Colorado 的员工。</p>
+<pre><code class="language-SQL">Projection: #dept_name, #first_name, #last_name
+  Filter: #state = 'CO'
+    Join: #employee.dept_id = #dept.id
+      Scan: employee; projection=[first_name, id, last_name, state]
+      Scan: dept; projection=[id, dept_name]
+</code></pre>
+<p>这样查询虽然能够产生正确的结果，但也因为对所有员工数据进行连接导致冗余的开销，而不仅是那些位于 Colorado 的员工。谓词下推规则将把过滤器下推到连接中，如下面的查询计划所示。</p>
+<pre><code class="language-SQL">Projection: #dept_name, #first_name, #last_name
+  Join: #employee.dept_id = #dept.id
+    Filter: #state = 'CO'
+      Scan: employee; projection=[first_name, id, last_name, state]
+    Scan: dept; projection=[id, dept_name]
+</code></pre>
+<p>连接现在将只处理员工信息的一个子集，从而达到更好的性能。</p>
+<h3 id="eliminate-common-subexpressions-消除公共子表达式"><a class="header" href="#eliminate-common-subexpressions-消除公共子表达式">Eliminate Common Subexpressions 消除公共子表达式</a></h3>
+<p>给定一个查询，例如 <code>SELECT sum(price * qty) as total_price, sum(price * qty * tax_rate) as total_tax FROM ...</code> 我们可以看到表达式 <code>price * qty</code> 出现了两次。我们可以选择重写计划来仅计算一次，而不是执行两次计算。</p>
+<p>原计划：</p>
+<pre><code class="language-SQL">Projection: sum(#price * #qty), sum(#price * #qty * #tax)
+  Scan: sales
+</code></pre>
+<p>优化后：</p>
+<pre><code class="language-SQL">Projection: sum(#_price_mult_qty), sum(#_price_mult_qty * #tax)
+  Projection: #price * #qty as _price_mult_qty
+    Scan: sales
+</code></pre>
+<h3 id="将相关子查询转换为连接"><a class="header" href="#将相关子查询转换为连接">将相关子查询转换为连接</a></h3>
+<p>给定一个查询，例如 <code>SELECT id FROM foo WHERE EXISTS (SELECT * FROM bar WHERE foo.id = bar.id)</code>。一个简单的实现是扫描 <code>foo</code> 中的所有行，然后对 <code>foo</code> 中的每一行在 <code>bar</code> 中执行查找。这样非常低效，因此查询引擎通常将相关子查询转换为连接。这也称为子查询去相关。</p>
+<p>上述请求可以重写为 <code>SELECT foo.id FROM foo JOIN bar ON foo.id = bar.id</code>。</p>
+<pre><code class="language-SQL">Projection: foo.id
+  LeftSemi Join: foo.id = bar.id
+    TableScan: foo projection=[id]
+    TableScan: bar projection=[id]
+</code></pre>
+<p>如果将查询修改为使用 <code>NOT EXISTS</code> 而不是 <code>EXISTS</code>，那么查询计划将使用 <code>LeftAnti</code> 而不是 <code>LeftSemi</code> 进行连接。</p>
+<pre><code class="language-SQL">Projection: foo.id
+  LeftAnti Join: foo.id = bar.id
+    TableScan: foo projection=[id]
+    TableScan: bar projection=[id]
+</code></pre>
+<h3 id="cost-based-optimizations"><a class="header" href="#cost-based-optimizations">Cost-Based Optimizations</a></h3>
+<p>基于开销的优化是指使用有关基础数据的统计信息来确定执行特定查询的开销，然后通过寻找开销较小的计划来确定最优的执行计划的优化规则。一个很好的实现会根据基础数据表的大小选择要使用的连接算法，或者选择连接表的顺序。</p>
+<p>基于开销优化的一个主要缺点是，它们依赖于有关基础数据库的准确性和详细统计信息的可用性。此类统计信息通常包括每列统计信息，例如空值的数量、不同值的数量、最小值和最大值，以及显示列内值分布的直方图。直方图对于能够检测到像 <code>state = 'CA'</code> 这样的谓词可能比 <code>state = 'WY'</code> 产生更多的数据行（California 加利福尼亚州是美国人口最多的州，有 3900 万居民，而 Wyoming 怀俄明州是人口最少的州，居民不到 100 万）。</p>
+<p>当使用诸如 Orc 或 Parquet 这类的文件格式时，可以使用其中一些统计信息，但是通常有必要运行一个进程来构建这些统计信息，并且当数据量达到 TB 级，这种做法弊大于利，特别是对于 <code>ad-hoc</code> （临时的、特别的）查询。</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="query-execution-查询执行"><a class="header" href="#query-execution-查询执行">Query Execution 查询执行</a></h1>
+<p>我们现在可以编写代码来对 CSV 文件执行优化后的查询。</p>
+<p>在使用 KQuery 执行查询之前，使用一个可信的替代方案可能很有用，以便我们知道正确的结果应该是什么，并获得一些基线性能指标以进行比较。</p>
+<h2 id="apache-spark-example-apache-spark-示例"><a class="header" href="#apache-spark-example-apache-spark-示例">Apache Spark Example Apache Spark 示例</a></h2>
+<blockquote>
+<p>本章讨论的源代码可以在 KQuery 的 <a href="https://github.com/andygrove/how-query-engines-work/tree/main/spark">spark</a> 模块中找到。</p>
+</blockquote>
+<p>首先我们需要创建一个 Spark 上下文。请注意，我们使用单线程执行，以便我们可以相对公平地比较 KQuery 中单线程实现的性能。</p>
+<pre><code class="language-SQL">val spark = SparkSession.builder()
+  .master(&quot;local[1]&quot;)
+  .getOrCreate()
+</code></pre>
+<p>下一步，我们需要根据上下文将 CSV 文件注册成 DataFrame。</p>
+<pre><code class="language-kotlin">val schema = StructType(Seq(
+  StructField(&quot;VendorID&quot;, DataTypes.IntegerType),
+  StructField(&quot;tpep_pickup_datetime&quot;, DataTypes.TimestampType),
+  StructField(&quot;tpep_dropoff_datetime&quot;, DataTypes.TimestampType),
+  StructField(&quot;passenger_count&quot;, DataTypes.IntegerType),
+  StructField(&quot;trip_distance&quot;, DataTypes.DoubleType),
+  StructField(&quot;RatecodeID&quot;, DataTypes.IntegerType),
+  StructField(&quot;store_and_fwd_flag&quot;, DataTypes.StringType),
+  StructField(&quot;PULocationID&quot;, DataTypes.IntegerType),
+  StructField(&quot;DOLocationID&quot;, DataTypes.IntegerType),
+  StructField(&quot;payment_type&quot;, DataTypes.IntegerType),
+  StructField(&quot;fare_amount&quot;, DataTypes.DoubleType),
+  StructField(&quot;extra&quot;, DataTypes.DoubleType),
+  StructField(&quot;mta_tax&quot;, DataTypes.DoubleType),
+  StructField(&quot;tip_amount&quot;, DataTypes.DoubleType),
+  StructField(&quot;tolls_amount&quot;, DataTypes.DoubleType),
+  StructField(&quot;improvement_surcharge&quot;, DataTypes.DoubleType),
+  StructField(&quot;total_amount&quot;, DataTypes.DoubleType)
+))
+
+val tripdata = spark.read.format(&quot;csv&quot;)
+  .option(&quot;header&quot;, &quot;true&quot;)
+  .schema(schema)
+  .load(&quot;/mnt/nyctaxi/csv/yellow_tripdata_2019-01.csv&quot;)
+
+tripdata.createOrReplaceTempView(&quot;tripdata&quot;)
+</code></pre>
+<p>最后我们可以继续对 DataFrame 执行 SQL。</p>
+<pre><code class="language-kotlin">val start = System.currentTimeMillis()
+
+val df = spark.sql(
+  &quot;&quot;&quot;SELECT passenger_count, MAX(fare_amount)
+    |FROM tripdata
+    |GROUP BY passenger_count&quot;&quot;&quot;.stripMargin)
+
+df.foreach(row =&gt; println(row))
+
+val duration = System.currentTimeMillis() - start
+
+println(s&quot;Query took $duration ms&quot;)
+</code></pre>
+<p>在我的台式机上执行代码输出结果如下：</p>
+<pre><code class="language-SQL">[1,623259.86]
+[6,262.5]
+[3,350.0]
+[5,760.0]
+[9,92.0]
+[4,500.0]
+[8,87.0]
+[7,78.0]
+[2,492.5]
+[0,36090.3]
+Query took 14418 ms
+</code></pre>
+<h3 id="kquery-examples-kquery-示例"><a class="header" href="#kquery-examples-kquery-示例">KQuery Examples KQuery 示例</a></h3>
+<blockquote>
+<p>本章讨论的源代码可以在 KQuery 的 <a href="https://github.com/andygrove/how-query-engines-work/tree/main/jvm/examples">examples</a> 模块中找到。</p>
+</blockquote>
+<p>下面是用 KQuery 实现的等效查询。请注意，这段代码与 Spark 示例不同，因为 KQuery 还没有指定 CSV 文件模式的选项，所以所有数据类型都是字符串。这意味着我们需要向查询计划添加显式强制转换，以将车费金额列转化为数值类型。</p>
+<pre><code class="language-kotlin">val time = measureTimeMillis {
+
+val ctx = ExecutionContext()
+
+val df = ctx.csv(&quot;/mnt/nyctaxi/csv/yellow_tripdata_2019-01.csv&quot;, 1*1024)
+            .aggregate(
+               listOf(col(&quot;passenger_count&quot;)),
+               listOf(max(cast(col(&quot;fare_amount&quot;), ArrowTypes.FloatType))))
+
+val optimizedPlan = Optimizer().optimize(df.logicalPlan())
+val results = ctx.execute(optimizedPlan)
+
+results.forEach { println(it.toCSV()) }
+
+println(&quot;Query took $time ms&quot;)
+</code></pre>
+<p>这将在我的台式机上产生以下输出：</p>
+<pre><code class="language-SQL">Schema&lt;passenger_count: Utf8, MAX: FloatingPoint(DOUBLE)&gt;
+1,623259.86
+2,492.5
+3,350.0
+4,500.0
+5,760.0
+6,262.5
+7,78.0
+8,87.0
+9,92.0
+0,36090.3
+
+Query took 6740 ms
+</code></pre>
+<p>我们可以看到，结果与 Apache Spark 生成的结果相匹配。我们还看到其在当前输入规模下的性能优化十分可观。由于 Apache Spark 针对 “大数据” 进行了优化，因此在处理更大的数据集时，它的性能很可能会超过 KQuery。</p>
+<h3 id="removing-the-query-optimizer-移除查询优化器"><a class="header" href="#removing-the-query-optimizer-移除查询优化器">Removing The Query Optimizer 移除查询优化器</a></h3>
+<p>让我们一处这些优化，看看它们对性能有多大帮助。</p>
+<pre><code class="language-kotlin">val time = measureTimeMillis {
+
+val ctx = ExecutionContext()
+
+val df = ctx.csv(&quot;/mnt/nyctaxi/csv/yellow_tripdata_2019-01.csv&quot;, 1*1024)
+            .aggregate(
+               listOf(col(&quot;passenger_count&quot;)),
+               listOf(max(cast(col(&quot;fare_amount&quot;), ArrowTypes.FloatType))))
+
+val results = ctx.execute(df.logicalPlan())
+
+results.forEach { println(it.toCSV()) }
+
+println(&quot;Query took $time ms&quot;)
+</code></pre>
+<p>这将在我的台式机上产生如下输出：</p>
+<pre><code class="language-SQL">1,623259.86
+2,492.5
+3,350.0
+4,500.0
+5,760.0
+6,262.5
+7,78.0
+8,87.0
+9,92.0
+0,36090.3
+
+Query took 36090 ms
+</code></pre>
+<p>结果是一致的，但执行查询所花费的时间大约多了五倍。这充分显现了上一章中所讨论的映射下推优化所带来的好处。</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="sql-支持"><a class="header" href="#sql-支持">SQL 支持</a></h1>
+<blockquote>
+<p>本章讨论的源代码可以在 KQuery 的 <a href="https://github.com/andygrove/how-query-engines-work/tree/main/jvm/examples">examples</a> 模块中找到。</p>
+</blockquote>
+<p>除了具有手动编码逻辑计划的能力外，在某些情况下，仅编写 SQL 将更加方便。在本章节中，我们将构建一个可以将 SQL 查询转化为逻辑计划的 SQL 解析器和查询规划器。</p>
+<h2 id="tokenizer-分词器"><a class="header" href="#tokenizer-分词器">Tokenizer 分词器</a></h2>
+<p>第一步是将 SQL 查询字符串转换为表示关键字、文字、标识符和操作符的令牌列表。</p>
+<p>下面是所有可能令牌的子集，目前已经够用了。</p>
+<pre><code class="language-kotlin">interface Token
+data class IdentifierToken(val s: String) : Token
+data class LiteralStringToken(val s: String) : Token
+data class LiteralLongToken(val s: String) : Token
+data class KeywordToken(val s: String) : Token
+data class OperatorToken(val s: String) : Token
+</code></pre>
+<p>然后我们需要一个 tokenizer 类。在这里介绍这一点不是特别有趣，完整的代码可以在配套的 <a href="https://github.com/andygrove/how-query-engines-work/blob/main/jvm/sql/src/main/kotlin/SqlTokenizer.kt">Github 仓库</a>中找到。</p>
+<pre><code class="language-kotlin">class Tokenizer {
+  fun tokenize(sql: String): List&lt;Token&gt; {
+    // see github repo for code
+  }
+}
+</code></pre>
+<p>给定输入 <code>SELECT a + b FROM c</code>，我们期望可以得到以下输出：</p>
+<pre><code class="language-kotlin">listOf(
+  KeywordToken(&quot;SELECT&quot;),
+  IdentifierToken(&quot;a&quot;),
+  OperatorToken(&quot;+&quot;),
+  IdentifierToken(&quot;b&quot;),
+  KeywordToken(&quot;FROM&quot;),
+  IdentifierToken(&quot;c&quot;)
+)
+</code></pre>
+<h2 id="pratt-parser"><a class="header" href="#pratt-parser">Pratt Parser</a></h2>
+<blockquote>
+<p>译者注：相关阅读可参考 <a href="https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html">https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html</a></p>
+</blockquote>
+<p>我们将根据 Vaughan R. Pratt 在 1973 年发表的<a href="http://tdop.github.io/">自顶向下运算符优先级</a>论文，手动编写一个 SQL 解析器。尽管还有其它方法可以构建 SQL 解析器，比如使用解析器生成器和解析器组合器，但我发现 Pratt 的方法很好，而且生成的代码高效，易于理解和调试。</p>
+<p>下面是 Pratt 解析器的基本实现。在我看来，它的美丽在于它的简单。表达式解析是通过一个简单的循环来执行的，该循环解析一个 “prefix 前缀” 表达式，然后是可选的 “infix 中缀” 表达式，并继续执行此操作，直到优先级发生改变，使解析器认识到它已经完成了对表达式的解析。当然 <code>parsePrefix</code> 和 <code>parseInfix</code> 实现可以递归地回到 <code>parse</code> 方法中，这就是它变得非常强大的地方。</p>
+<pre><code class="language-kotlin">interface PrattParser {
+  /** Parse an expression */
+  fun parse(precedence: Int = 0): SqlExpr? {
+    var expr = parsePrefix() ?: return null
+    while (precedence &lt; nextPrecedence()) {
+      expr = parseInfix(expr, nextPrecedence())
+    }
+    return expr
+  }
+
+  /** Get the precedence of the next token */
+  fun nextPrecedence(): Int
+
+  /** Parse the next prefix expression */
+  fun parsePrefix(): SqlExpr?
+
+  /** Parse the next infix expression */
+  fun parseInfix(left: SqlExpr, precedence: Int): SqlExpr
+}
+</code></pre>
+<p>这个接口引用了一个新的 SqlExpr 类，它将作为解析表达式的表示形式，并且在很大程度上将是逻辑计划中定义的表达式的一对一映射。但是对于二元表达式，我们可以使用其中运算符是字符串这种更为通用的结构，而不是为我们将支持的所有不同的二进制表达式创建单独的数据结构。</p>
+<p>下面是 SqlExpr 实现的一些示例：</p>
+<pre><code class="language-kotlin">/** SQL Expression */
+interface SqlExpr
+
+/** Simple SQL identifier such as a table or column name */
+data class SqlIdentifier(val id: String) : SqlExpr {
+  override fun toString() = id
+}
+
+/** Binary expression */
+data class SqlBinaryExpr(val l: SqlExpr, val op: String, val r: SqlExpr) : SqlExpr {
+  override fun toString(): String = &quot;$l $op $r&quot;
+}
+
+/** SQL literal string */
+data class SqlString(val value: String) : SqlExpr {
+  override fun toString() = &quot;'$value'&quot;
+}
+</code></pre>
+<p>有了这些类，就可以用下面的代码表示表达式 <code>foo = bar</code>。</p>
+<pre><code class="language-kotlin">val sqlExpr = SqlBinaryExpr(SqlIdentifier(&quot;foo&quot;), &quot;=&quot;, SqlString(&quot;bar&quot;))
+</code></pre>
+<h2 id="parsing-sql-expressions-解析-sql-表达式"><a class="header" href="#parsing-sql-expressions-解析-sql-表达式">Parsing SQL Expressions 解析 SQL 表达式</a></h2>
+<p>让我们通过这种方式来解析一个简单的数学表达式，例如 <code>1 + 2 * 3</code>。该表达式由以下标记组成。</p>
+<pre><code class="language-kotlin">listOf(
+  LiteralLongToken(&quot;1&quot;),
+  OperatorToken(&quot;+&quot;),
+  LiteralLongToken(&quot;2&quot;),
+  OperatorToken(&quot;*&quot;),
+  LiteralLongToken(&quot;3&quot;)
+)
+</code></pre>
+<p>我们需要创建 <code>PrattParser</code> 的 trait 特性实现，然后将令牌传递给构造函数。令牌封装在 <code>TokenStream</code> 类中，该类提供了一些方便的方法，例如用于消费下一个令牌的 <code>next</code>，以及当我们希望在不消费令牌的情况下查看时的 <code>peek</code>。</p>
+<pre><code class="language-kotlin">class SqlParser(val tokens: TokenStream) : PrattParser {
+}
+</code></pre>
+<p>实现 <code>nextPrecedence</code> 方法很简单，因为这里只有少量具任何优先级的令牌，并且我们需要使乘法和除法运算符具有比加减法运算符更高的优先级。注意，这个方法返回的具体数字并不重要，因为它们只是用于比较。在 <a href="https://www.postgresql.org/docs/7.2/sql-precedence.html">PostgreSQL 文档</a> 中可以找到一个很好的运算符优先级参考。</p>
+<pre><code class="language-kotlin">override fun nextPrecedence(): Int {
+  val token = tokens.peek()
+  return when (token) {
+    is OperatorToken -&gt; {
+      when (token.s) {
+        &quot;+&quot;, &quot;-&quot; -&gt; 50
+        &quot;*&quot;, &quot;/&quot; -&gt; 60
+        else -&gt; 0
+      }
+    }
+    else -&gt; 0
+  }
+}
+</code></pre>
+<p>前缀解析器只需要知道如何解析字面数值。</p>
+<pre><code class="language-kotlin">override fun parsePrefix(): SqlExpr? {
+  val token = tokens.next() ?: return null
+  return when (token) {
+    is LiteralLongToken -&gt; SqlLong(token.s.toLong())
+    else -&gt; throw IllegalStateException(&quot;Unexpected token $token&quot;)
+  }
+}
+</code></pre>
+<p>中缀解析器只需要知道如何解析运算符。注意，在解析运算符之后，此方法将递归地回调倒顶层解析方法，以解析运算符后面的表达式（二元表达式的右侧）。</p>
+<pre><code class="language-kotlin">override fun parseInfix(left: SqlExpr, precedence: Int): SqlExpr {
+  val token = tokens.peek()
+  return when (token) {
+    is OperatorToken -&gt; {
+      tokens.next()
+      SqlBinaryExpr(left, token.s, parse(precedence) ?:
+                    throw SQLException(&quot;Error parsing infix&quot;))
+    }
+    else -&gt; throw IllegalStateException(&quot;Unexpected infix token $token&quot;)
+  }
+}
+</code></pre>
+<p>优先级逻辑可以通过解析数学表达式 <code>1 + 2 * 3</code> 和 <code>1 * 2 + 3</code>来证明，它们应该分别被解析为 <code>1 + (2 * 3)</code> 和 <code>(1 * 2) + 3</code>。</p>
+<p>例如：解析 <code>1 + 2 _ 3 *</code>。</p>
+<p>以下是令牌及其优先级值。</p>
+<pre><code class="language-kotlin">Tokens:      [1]  [+]  [2]  [*]  [3]
+Precedence:  [0] [50]  [0] [60]  [0]
+</code></pre>
+<p>最终结果将表达式正确地表述为 <code>1 + (2 * 3)</code>。</p>
+<pre><code class="language-kotlin">SqlBinaryExpr(
+    SqlLong(1),
+    &quot;+&quot;,
+    SqlBinaryExpr(SqlLong(2), &quot;*&quot;, SqlLong(3))
+)
+</code></pre>
+<p>例如：解析 <code>1 _ 2 + 3*</code>。</p>
+<pre><code class="language-kotlin">Tokens:      [1]  [*]  [2]  [+]  [3]
+Precedence:  [0] [60]  [0] [50]  [0]
+</code></pre>
+<p>最终结果将表达式正确地表述为 <code>(1 * 2) + 3</code>。</p>
+<pre><code class="language-kotlin">SqlBinaryExpr(
+    SqlBinaryExpr(SqlLong(1), &quot;*&quot;, SqlLong(2)),
+    &quot;+&quot;,
+    SqlLong(3)
+)
+</code></pre>
+<h2 id="parsing-a-select-statement-解析-select-语句"><a class="header" href="#parsing-a-select-statement-解析-select-语句">Parsing a SELECT statement 解析 SELECT 语句</a></h2>
+<p>现在我们已经能够解析一些简单地表达式了，下一步是扩展解析器，以支持将 SELECT 语句解析为具体的语法树 (CST)。请注意，对于其它的解析方法，例如使用像 <a href="https://www.antlr.org/">ANTLR</a> 这样的解析生成器，会有一个称为抽象语法树 (AST) 的中间阶段，然后需要将其转换为具体语法树，但是使用 Pratt 解析器方法，我们可以直接从令牌转换为具体语法树。</p>
+<p>下面是一个示例 CST，它可以表示带有映射和选择的简易单表查询。将在后面的章节中对齐进行扩展以支持更复杂的查询。</p>
+<pre><code class="language-kotlin">data class SqlSelect(
+    val projection: List&lt;SqlExpr&gt;,
+    val selection: SqlExpr,
+    val tableName: String) : SqlRelation
+</code></pre>
+<h2 id="sql-query-planner-sql-查询规划器"><a class="header" href="#sql-query-planner-sql-查询规划器">SQL Query Planner SQL 查询规划器</a></h2>
+<p>SQL 查询规划器将 SQL 查询树转换为逻辑计划。由于 SQL 语言的灵活性，这将比逻辑计划转换为物理计划要困难得多。例如，考虑下面的简单查询：</p>
+<pre><code class="language-kotlin">SELECT id, first_name, last_name, salary/12 AS monthly_salary
+FROM employee
+WHERE state = 'CO' AND monthly_salary &gt; 1000
+</code></pre>
+<p>虽然这对于阅读的人来说很直观，但是查询的选择部分 (<code>WHERE</code> 子句) 引用了一个表达式 (<code>state</code>)，该表达式不包含在映射的输出中，因此显然需要在映射前应用，当它同时也应用了另一个表达式 (<code>salary/12 AS monthly_salary</code>)，该表达式只有在应用映射后才可用。在使用 <code>GROUP BY</code>、<code>HAVING</code> 和 <code>ORDER BY</code> 子句时，我们也会遇到类似的问题。</p>
+<p>这个问题有多种解决方案。一种方案是将此查询转换未以下逻辑计划，将表达式分成两个步骤，一个在映射前，另一个在映射后。但是，这样可行仅仅是因为所选的表达式是一个结合性谓词（只有在所有部分都是正确的情况下，表达式是正确的），而对于更复杂的表达式来说，这种方法可能无法使用。如果该表达式变为 <code>state = 'CO' OR monthly_salary &gt; 1000</code>，那么我们将无法执行此操作。</p>
+<pre><code class="language-SQL">Filter: #monthly_salary &gt; 1000
+  Projection: #id, #first_name, #last_name, #salary/12 AS monthly_salary
+    Filter: #state = 'CO'
+      Scan: table=employee
+</code></pre>
+<p>一种更加简单通用的方法是将所有必须的表达式加到映射中，以便可以在映射后应用选择，然后通过在另一个映射中封装输出来移除所有多余的列。</p>
+<pre><code class="language-kotlin">Projection: #id, #first_name, #last_name, #monthly_salary
+  Filter: #state = 'CO' AND #monthly_salary &gt; 1000
+    Projection: #id, #first_name, #last_name, #salary/12 AS monthly_salary, #state
+      Scan: table=employee
+</code></pre>
+<p>值得注意的是，我们将在后面的章节中构建一个 &quot;Predicate Push Down&quot; 查询优化器规则，它能够优化该计划，并将谓词的 <code>state = 'CO'</code> 部分推到计划的更下方，使其位于映射之前。</p>
+<h2 id="translating-sql-expressions-转换-sql-表达式"><a class="header" href="#translating-sql-expressions-转换-sql-表达式">Translating SQL Expressions 转换 SQL 表达式</a></h2>
+<p>将 SQL 表达式转换未逻辑表达式相当简单，如本示例代码所示：</p>
+<pre><code class="language-kotlin">private fun createLogicalExpr(expr: SqlExpr, input: DataFrame) : LogicalExpr {
+  return when (expr) {
+    is SqlIdentifier -&gt; Column(expr.id)
+    is SqlAlias -&gt; Alias(createLogicalExpr(expr.expr, input), expr.alias.id)
+    is SqlString -&gt; LiteralString(expr.value)
+    is SqlLong -&gt; LiteralLong(expr.value)
+    is SqlDouble -&gt; LiteralDouble(expr.value)
+    is SqlBinaryExpr -&gt; {
+      val l = createLogicalExpr(expr.l, input)
+      val r = createLogicalExpr(expr.r, input)
+      when(expr.op) {
+        // comparison operators
+        &quot;=&quot; -&gt; Eq(l, r)
+        &quot;!=&quot; -&gt; Neq(l, r)
+        &quot;&gt;&quot; -&gt; Gt(l, r)
+        &quot;&gt;=&quot; -&gt; GtEq(l, r)
+        &quot;&lt;&quot; -&gt; Lt(l, r)
+        &quot;&lt;=&quot; -&gt; LtEq(l, r)
+        // boolean operators
+        &quot;AND&quot; -&gt; And(l, r)
+        &quot;OR&quot; -&gt; Or(l, r)
+        // math operators
+        &quot;+&quot; -&gt; Add(l, r)
+        &quot;-&quot; -&gt; Subtract(l, r)
+        &quot;*&quot; -&gt; Multiply(l, r)
+        &quot;/&quot; -&gt; Divide(l, r)
+        &quot;%&quot; -&gt; Modulus(l, r)
+        else -&gt; throw SQLException(&quot;Invalid operator ${expr.op}&quot;)
+      }
+    }
+
+    else -&gt; throw new UnsupportedOperationException()
+  }
+}
+</code></pre>
+<h2 id="planning-select-规划-select"><a class="header" href="#planning-select-规划-select">Planning SELECT 规划 SELECT</a></h2>
+<p>如果我们只想支持所选列引用也全都存在于映射中，我们也可以使用一些非常简单的逻辑来构建查询计划。</p>
+<pre><code class="language-kotlin">fun createDataFrame(select: SqlSelect, tables: Map&lt;String, DataFrame&gt;) : DataFrame {
+
+  // get a reference to the data source
+  var df = tables[select.tableName] ?:
+      throw SQLException(&quot;No table named '${select.tableName}'&quot;)
+
+  val projectionExpr = select.projection.map { createLogicalExpr(it, df) }
+
+  if (select.selection == null) {
+    // apply projection
+    return df.select(projectionExpr)
+  }
+
+  // apply projection then wrap in a selection (filter)
+  return df.select(projectionExpr)
+           .filter(createLogicalExpr(select.selection, df))
+}
+</code></pre>
+<p>然而，由于选择可以映射的输入和输出，因此我们需要创建一个带有中间映射的更复杂的计划。第一步是通过选择过滤器表达式以确定哪些列是被引用到的。为此，我们将使用访问者模式遍历表达式树，并构建一个可变的列名称集合。</p>
+<p>下面是我们将用于遍历表达式树的方法：</p>
+<pre><code class="language-kotlin">private fun visit(expr: LogicalExpr, accumulator: MutableSet&lt;String&gt;) {
+  when (expr) {
+    is Column -&gt; accumulator.add(expr.name)
+    is Alias -&gt; visit(expr.expr, accumulator)
+    is BinaryExpr -&gt; {
+      visit(expr.l, accumulator)
+      visit(expr.r, accumulator)
+     }
+  }
+}
+</code></pre>
+<p>至此，我们现在可以编写以下代码，将 SELECT 语句转换为有效的逻辑计划。下面的示例代码并不完美，并且在特殊情况下下可能包含一些错误，例如数据源中的列和别名表达式之间存在名称冲突，但是为了保持代码简洁，我们将暂时忽略这一点。</p>
+<pre><code class="language-kotlin">fun createDataFrame(select: SqlSelect, tables: Map&lt;String, DataFrame&gt;) : DataFrame {
+
+  // get a reference to the data source
+  var df = tables[select.tableName] ?:
+    throw SQLException(&quot;No table named '${select.tableName}'&quot;)
+
+  // create the logical expressions for the projection
+  val projectionExpr = select.projection.map { createLogicalExpr(it, df) }
+
+  if (select.selection == null) {
+    // if there is no selection then we can just return the projection
+    return df.select(projectionExpr)
+  }
+
+  // create the logical expression to represent the selection
+  val filterExpr = createLogicalExpr(select.selection, df)
+
+  // get a list of columns references in the projection expression
+  val columnsInProjection = projectionExpr
+    .map { it.toField(df.logicalPlan()).name}
+    .toSet()
+
+  // get a list of columns referenced in the selection expression
+  val columnNames = mutableSetOf&lt;String&gt;()
+  visit(filterExpr, columnNames)
+
+  // determine if the selection references any columns not in the projection
+  val missing = columnNames - columnsInProjection
+
+  // if the selection only references outputs from the projection we can
+  // simply apply the filter expression to the DataFrame representing
+  // the projection
+  if (missing.size == 0) {
+    return df.select(projectionExpr)
+             .filter(filterExpr)
+  }
+
+  // because the selection references some columns that are not in the
+  // projection output we need to create an interim projection that has
+  // the additional columns and then we need to remove them after the
+  // selection has been applied
+  return df.select(projectionExpr + missing.map { Column(it) })
+           .filter(filterExpr)
+           .select(projectionExpr.map {
+              Column(it.toField(df.logicalPlan()).name)
+            })
+}
+</code></pre>
+<h2 id="planning-for-aggregate-queries-规划聚合查询"><a class="header" href="#planning-for-aggregate-queries-规划聚合查询">Planning for Aggregate Queries 规划聚合查询</a></h2>
+<p>如你所见，SQL 查询规划器相对复杂，解析聚合查询的代码则更有甚之。如果你对此有兴趣了解更多，请参阅源代码。</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="parallel-query-execution-并行查询执行"><a class="header" href="#parallel-query-execution-并行查询执行">Parallel Query Execution 并行查询执行</a></h1>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+        <script>
+        window.addEventListener('load', function() {
+            window.setTimeout(window.print, 100);
+        });
+        </script>
+
+    </div>
+    </body>
+</html>

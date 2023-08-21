@@ -84,7 +84,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded affix "><a href="index.html">译者言</a></li><li class="chapter-item expanded "><a href="1-acknowledgments/index.html"><strong aria-hidden="true">1.</strong> 致谢</a></li><li class="chapter-item expanded "><a href="2-introduction/index.html"><strong aria-hidden="true">2.</strong> 介绍</a></li><li class="chapter-item expanded "><a href="3-what_is_a_query_engine/index.html"><strong aria-hidden="true">3.</strong> 什么是查询引擎</a></li><li class="chapter-item expanded "><a href="4-apache_arrow/index.html"><strong aria-hidden="true">4.</strong> Apache Arrow</a></li><li class="chapter-item expanded "><a href="5-type_system/index.html"><strong aria-hidden="true">5.</strong> 类型系统</a></li><li class="chapter-item expanded "><a href="6-data_sources/index.html"><strong aria-hidden="true">6.</strong> 数据源</a></li><li class="chapter-item expanded "><a href="7-logical_plans/index.html"><strong aria-hidden="true">7.</strong> 逻辑计划和表达式</a></li><li class="chapter-item expanded "><a href="8-dataframes/index.html"><strong aria-hidden="true">8.</strong> 数据帧</a></li><li class="chapter-item expanded "><a href="9-physical_plans/index.html"><strong aria-hidden="true">9.</strong> 物理计划和表达式</a></li><li class="chapter-item expanded "><a href="10-query_planner/index.html"><strong aria-hidden="true">10.</strong> 查询规划器</a></li><li class="chapter-item expanded "><a href="11-query_optimizations/index.html"><strong aria-hidden="true">11.</strong> 查询优化</a></li><li class="chapter-item expanded "><a href="12-query_execution/index.html"><strong aria-hidden="true">12.</strong> 查询执行</a></li><li class="chapter-item expanded "><a href="13-sql_support/index.html"><strong aria-hidden="true">13.</strong> SQL 支持</a></li><li class="chapter-item expanded "><a href="14-parallel_query_execution/index.html"><strong aria-hidden="true">14.</strong> 执行并行查询</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="index.html">译者言</a></li><li class="chapter-item expanded "><a href="1-acknowledgments/index.html"><strong aria-hidden="true">1.</strong> 致谢</a></li><li class="chapter-item expanded "><a href="2-introduction/index.html"><strong aria-hidden="true">2.</strong> 介绍</a></li><li class="chapter-item expanded "><a href="3-what_is_a_query_engine/index.html"><strong aria-hidden="true">3.</strong> 什么是查询引擎</a></li><li class="chapter-item expanded "><a href="4-apache_arrow/index.html"><strong aria-hidden="true">4.</strong> Apache Arrow</a></li><li class="chapter-item expanded "><a href="5-type_system/index.html"><strong aria-hidden="true">5.</strong> 类型系统</a></li><li class="chapter-item expanded "><a href="6-data_sources/index.html"><strong aria-hidden="true">6.</strong> 数据源</a></li><li class="chapter-item expanded "><a href="7-logical_plans/index.html"><strong aria-hidden="true">7.</strong> 逻辑计划和表达式</a></li><li class="chapter-item expanded "><a href="8-dataframes/index.html"><strong aria-hidden="true">8.</strong> 数据帧</a></li><li class="chapter-item expanded "><a href="9-physical_plans/index.html"><strong aria-hidden="true">9.</strong> 物理计划和表达式</a></li><li class="chapter-item expanded "><a href="10-query_planner/index.html"><strong aria-hidden="true">10.</strong> 查询规划器</a></li><li class="chapter-item expanded "><a href="11-query_optimizations/index.html"><strong aria-hidden="true">11.</strong> 查询优化</a></li><li class="chapter-item expanded "><a href="12-query_execution/index.html"><strong aria-hidden="true">12.</strong> 查询执行</a></li><li class="chapter-item expanded "><a href="13-sql_support/index.html"><strong aria-hidden="true">13.</strong> SQL 支持</a></li><li class="chapter-item expanded "><a href="14-parallel_query_execution/index.html"><strong aria-hidden="true">14.</strong> 执行并行查询</a></li><li class="chapter-item expanded "><a href="15-distributed_query_execution/index.html"><strong aria-hidden="true">15.</strong> 执行分布式查询</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -2090,8 +2090,8 @@ ctx.execute(df).forEach { println(it) }
 0,90000.0
 </code></pre>
 <h2 id="smarter-partitioning-更加智能的分区"><a class="header" href="#smarter-partitioning-更加智能的分区">Smarter Partitioning 更加智能的分区</a></h2>
-<p>尽管每个文件使用一个线程的策略在本例中运行良好，但它不能作为通用的分区方法。如果数据源有数千个小分区，那么在每个分区上都启动一个线程的效率会很低。更好的方法是由查询规划器来决定如何在指定数量的工作线程（或执行者）之间共享可用数据。</p>
-<p>有些文件格式已经具有自然分区方案。例如，Apache Parquet 文件由多个包含批量列数据的 “行组” 组成。查询规划器可以检查可用的 Parquet 文件，构建行组列表，然后安排在固定数量的线程或执行者中读取这些行组。</p>
+<p>尽管每个文件使用一个线程的策略在本例中运行良好，但它不能作为通用的分区方法。如果数据源有数千个小分区，那么在每个分区上都启动一个线程的效率会很低。更好的方法是由查询规划器来决定如何在指定数量的工作线程（或执行器）之间共享可用数据。</p>
+<p>有些文件格式已经具有自然分区方案。例如，Apache Parquet 文件由多个包含批量列数据的 “行组” 组成。查询规划器可以检查可用的 Parquet 文件，构建行组列表，然后安排在固定数量的线程或执行器中读取这些行组。</p>
 <p>甚至可以将此计数应用于非结构化文件，例如 CSV 文件，但这并不是一件容易的事。虽然检查文件大小并将文件分成大小相等的块很容易，但是一条记录可能跨越两个块，因此有必要从边界向后或向前读取以找到记录的起点或重点。查找换行符是不够的，因为这些字符通常也出现在记录中，并也用于界定激励。普遍的做法是将 CSV 文件转换为结构化格式，例如在处理管道前期转换为 Parquet 格式，以提高后续处理的效率。</p>
 <h2 id="partition-keys-分区键"><a class="header" href="#partition-keys-分区键">Partition Keys 分区键</a></h2>
 <p>解决此问题的一种方案是将文件放入目录中，并使用键值对组成目录名称来指定内容。</p>
@@ -2105,6 +2105,62 @@ ctx.execute(df).forEach { println(it) }
 <h2 id="parallel-joins-并行连接"><a class="header" href="#parallel-joins-并行连接">Parallel Joins 并行连接</a></h2>
 <p>当使用单个线程执行内部连接时，一种简单的方法是将连接的一侧加载到内存中，然后扫描另一侧，对存储在内存中的数据执行查找。如果连接的一侧可以放入内存，那么这种经典的哈希连接算法是行之有效的。</p>
 <p>这种连接的并行版本称为分区哈希连接或并行哈希连接。它包括基于连接键对两个输入进行分区，并在每个分区上执行传统的哈希连接。</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="distributed-query-execution-执行分布式查询"><a class="header" href="#distributed-query-execution-执行分布式查询">Distributed Query Execution 执行分布式查询</a></h1>
+<p>上一节关于并行查询执行的内容涵盖了一些基本概念，例如分区，本节将在此基础上进行构建。</p>
+<p>为了稍微简化执行分布式查询的概念，我们的目标是创建一个物理查询计划，该计划定义如何将工作分配给集群中的许多 “执行者”。分布式查询计划通常包含新的运算符，这些运算符描述了在请求执行期间数据是如何在不同时间点上与不同的执行者之间进行交换的。</p>
+<p>在下面的部分中，我们将深入探讨如何在分布式环境中执行不同类型的计划，然后讨论如何构建分布式查询调度器。</p>
+<h2 id="embarrassingly-parallel-operators-令人尴尬的并行运算符"><a class="header" href="#embarrassingly-parallel-operators-令人尴尬的并行运算符">Embarrassingly Parallel Operators 令人尴尬的并行运算符</a></h2>
+<p>在分布式环境下运行时，某些运算符可以在数据分区上并行运行，而不会产生任何显著的开销。最好的例子就是映射和过滤。这些运算符可以并行地应用于正在操作数据的每个输入分区，并为每个输入分区生成相应的输出分区。这些运算符不会改变数据分区方案。</p>
+<p><img src="https://howqueryengineswork.com/resources/distributed_project_filter.png" alt="分布式项目过滤器" /></p>
+<h2 id="distributed-aggregates-分布式聚合"><a class="header" href="#distributed-aggregates-分布式聚合">Distributed Aggregates 分布式聚合</a></h2>
+<p>让我们使用在上一章节执行并行查询中所用的 SQL 查询示例，并观察聚合查询在分布式计划中的含义。</p>
+<pre><code class="language-SQL">SELECT passenger_count, MAX(max_fare)
+FROM tripdata
+GROUP BY passenger_count
+</code></pre>
+<p>我们可以在 <code>tripdata</code> 表的所有分区上并行执行此查询，集群中的每个执行处理器负责这些分区的一部分。但是，我们需要将所有的结果聚合数据合并到单个节点上，才能应用最终的聚合查询，以便获得一个没有重复的分组键（本例中为 <code>passenger_count</code>） 的结果集合。下面是一个可能代表这种情况的逻辑查询计划。注意，新的 <code>Exchange</code> 操作符表示执行器之间的数据交换。交换的物理计划可以通过将中间结果写入共享存储来实现，或者可以通过将数据直接以流的形式传输到其它执行器来实现。</p>
+<pre><code class="language-SQL">HashAggregate: groupBy=[passenger_count], aggr=[MAX(max_fare)]
+  Exchange:
+    HashAggregate: groupBy=[passenger_count], aggr=[MAX(max_fare)]
+      Scan: tripdata.parquet
+</code></pre>
+<p>下图展示了如何在分布式环境中执行此查询：</p>
+<p><img src="https://howqueryengineswork.com/resources/distributed_agg.png" alt="分布式聚合" /></p>
+<h2 id="distributed-joins-分布式连接"><a class="header" href="#distributed-joins-分布式连接">Distributed Joins 分布式连接</a></h2>
+<p>连接通常是在分布式环境中执行的最昂贵的操作。这样说的原因是，我们需要确保在组织数据时，两个输入关系都根据连接键进行了分区。例如，如果我们把 <code>customer</code> 表连接到 <code>order</code> 表，其中连接的条件是 <code>customer.id = order.customer_id</code>，则两个表中针对特定客户的所有行必须由同一执行器处理。要实现这一点，我们必须受限对连接键上的两个表进行重新分区，并将分区写入磁盘。一旦完成，我们就可以对每个分区并行地执行连接了。结果数据仍将按连接键进行分区。这种特殊的连接算法称为分区哈希连接。重新划分数据地过程称为执行 &quot;shuffle&quot;。</p>
+<p><img src="https://howqueryengineswork.com/resources/distributed_join.png" alt="分布式连接" /></p>
+<h2 id="distirbuted-query-scheduling-分布式查询调度"><a class="header" href="#distirbuted-query-scheduling-分布式查询调度">Distirbuted Query Scheduling 分布式查询调度</a></h2>
+<p>分布式查询计划与进程内查询计划有本质上地不同，因为我们不能仅仅构建一个运算符树并开始执行它们。现在的查询需要跨执行器进行协调，这意味着我们现在开始需要构建一个调度器。</p>
+<p>在高层次上，分布式查询调度器的概念并不复杂。调度器需要检查整个查询，并将其分解为可以单独主席那个的阶段（通常跨执行器并行执行），然后根据集群中的可用资源调度执行这些阶段。一旦每个查询阶段完成，就可以安排任何后续的依赖性查询阶段。直到所有查询都被执行完成前都重复这一过程。</p>
+<p>调度器还可以负责管理集群中的计算资源，以便可以根据需要启动额外的执行器来处理查询负载。</p>
+<p>在本章节的其余部分，我们将讨论以下主题，即 Ballista 和该项目中实现的设计。</p>
+<ul>
+<li>生成分布式查询计划</li>
+<li>序列化查询计划并于执行器交换</li>
+<li>在执行器之间交换中间结果</li>
+<li>优化分布式查询</li>
+</ul>
+<h2 id="producing-a-distributed-query-plan-生成分布式查询计划"><a class="header" href="#producing-a-distributed-query-plan-生成分布式查询计划">Producing a Distributed Query Plan 生成分布式查询计划</a></h2>
+<p>正如我们在前例中看到的那样，一些运算符可以在输入分区上并行运行，而另一些运算符需要对数据进行重新分区。分区中的这些变动是规划分布式查询的关键。计划中的分区变更有时称为管道中断，分区时的这些变更定义了查询阶段之间的边界。</p>
+<p>现在我们将使用下面的 SQL 查询来了解这个过程具体是如何工作的：</p>
+<pre><code class="language-SQL">SELECT customer.id, sum(order.amount) as total_amount
+FROM customer JOIN order ON customer.id = order.customer_id
+GROUP BY customer.id
+</code></pre>
+<p>该查询的（非分布式）物理计划如下所示：</p>
+<pre><code class="language-SQL">Projection: #customer.id, #total_amount
+  HashAggregate: groupBy=[customer.id], aggr=[MAX(max_fare) AS total_amount]
+    Join: condition=[customer.id = order.customer_id]
+      Scan: customer
+      Scan: order
+</code></pre>
+<p>假设 customer 和 order 表还没有根据 customer id 进行分区，我们将需要调度执行前两个查询阶段，以对该数据进行重新分区。这两个查询阶段可以并行。</p>
+<pre><code class="language-SQL">Query Stage #1: repartition=[customer.id]
+  Scan: customer
+Query Stage #2: repartition=[order.customer_id]
+  Scan: order
+</code></pre>
+<p>接下来，我们可以调度连接，它将在两个输入的各个分区并行运行。连接之后的下一个运算符是聚合，它被分成两部分：并行前的聚合，然后是需要变成单个输入分区的最终聚合。我们可以在与连接相同的查询阶段执行此聚合的并行部分。</p>
 
                     </main>
 

@@ -1,0 +1,276 @@
+<!DOCTYPE HTML>
+<html lang="zh-CN" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>执行分布式查询 - How Query Engines Work (中文版)</title>
+
+
+        <!-- Custom HTML head -->
+        
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+    </head>
+    <body>
+    <div id="body-container">
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var html = document.querySelector('html');
+            var sidebar = null;
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="../index.html">译者言</a></li><li class="chapter-item expanded "><a href="../1-acknowledgments/index.html"><strong aria-hidden="true">1.</strong> 致谢</a></li><li class="chapter-item expanded "><a href="../2-introduction/index.html"><strong aria-hidden="true">2.</strong> 介绍</a></li><li class="chapter-item expanded "><a href="../3-what_is_a_query_engine/index.html"><strong aria-hidden="true">3.</strong> 什么是查询引擎</a></li><li class="chapter-item expanded "><a href="../4-apache_arrow/index.html"><strong aria-hidden="true">4.</strong> Apache Arrow</a></li><li class="chapter-item expanded "><a href="../5-type_system/index.html"><strong aria-hidden="true">5.</strong> 类型系统</a></li><li class="chapter-item expanded "><a href="../6-data_sources/index.html"><strong aria-hidden="true">6.</strong> 数据源</a></li><li class="chapter-item expanded "><a href="../7-logical_plans/index.html"><strong aria-hidden="true">7.</strong> 逻辑计划和表达式</a></li><li class="chapter-item expanded "><a href="../8-dataframes/index.html"><strong aria-hidden="true">8.</strong> 数据帧</a></li><li class="chapter-item expanded "><a href="../9-physical_plans/index.html"><strong aria-hidden="true">9.</strong> 物理计划和表达式</a></li><li class="chapter-item expanded "><a href="../10-query_planner/index.html"><strong aria-hidden="true">10.</strong> 查询规划器</a></li><li class="chapter-item expanded "><a href="../11-query_optimizations/index.html"><strong aria-hidden="true">11.</strong> 查询优化</a></li><li class="chapter-item expanded "><a href="../12-query_execution/index.html"><strong aria-hidden="true">12.</strong> 查询执行</a></li><li class="chapter-item expanded "><a href="../13-sql_support/index.html"><strong aria-hidden="true">13.</strong> SQL 支持</a></li><li class="chapter-item expanded "><a href="../14-parallel_query_execution/index.html"><strong aria-hidden="true">14.</strong> 执行并行查询</a></li><li class="chapter-item expanded "><a href="../15-distributed_query_execution/index.html" class="active"><strong aria-hidden="true">15.</strong> 执行分布式查询</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <!-- Track and set sidebar scroll position -->
+        <script>
+            var sidebarScrollbox = document.querySelector('#sidebar .sidebar-scrollbox');
+            sidebarScrollbox.addEventListener('click', function(e) {
+                if (e.target.tagName === 'A') {
+                    sessionStorage.setItem('sidebar-scroll', sidebarScrollbox.scrollTop);
+                }
+            }, { passive: true });
+            var sidebarScrollTop = sessionStorage.getItem('sidebar-scroll');
+            sessionStorage.removeItem('sidebar-scroll');
+            if (sidebarScrollTop) {
+                // preserve sidebar scroll position when navigating via links within sidebar
+                sidebarScrollbox.scrollTop = sidebarScrollTop;
+            } else {
+                // scroll sidebar to current active section when navigating via "next/previous chapter" buttons
+                var activeSection = document.querySelector('#sidebar .active');
+                if (activeSection) {
+                    activeSection.scrollIntoView({ block: 'center' });
+                }
+            }
+        </script>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">How Query Engines Work (中文版)</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/ArkToria/How_Query_Engines_Work" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/ArkToria/How_Query_Engines_Work/edit/main/docs/15-distributed_query_execution/index.md" title="Suggest an edit" aria-label="Suggest an edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="distributed-query-execution-执行分布式查询"><a class="header" href="#distributed-query-execution-执行分布式查询">Distributed Query Execution 执行分布式查询</a></h1>
+<p>上一节关于并行查询执行的内容涵盖了一些基本概念，例如分区，本节将在此基础上进行构建。</p>
+<p>为了稍微简化执行分布式查询的概念，我们的目标是创建一个物理查询计划，该计划定义如何将工作分配给集群中的许多 “执行者”。分布式查询计划通常包含新的运算符，这些运算符描述了在请求执行期间数据是如何在不同时间点上与不同的执行者之间进行交换的。</p>
+<p>在下面的部分中，我们将深入探讨如何在分布式环境中执行不同类型的计划，然后讨论如何构建分布式查询调度器。</p>
+<h2 id="embarrassingly-parallel-operators-令人尴尬的并行运算符"><a class="header" href="#embarrassingly-parallel-operators-令人尴尬的并行运算符">Embarrassingly Parallel Operators 令人尴尬的并行运算符</a></h2>
+<p>在分布式环境下运行时，某些运算符可以在数据分区上并行运行，而不会产生任何显著的开销。最好的例子就是映射和过滤。这些运算符可以并行地应用于正在操作数据的每个输入分区，并为每个输入分区生成相应的输出分区。这些运算符不会改变数据分区方案。</p>
+<p><img src="https://howqueryengineswork.com/resources/distributed_project_filter.png" alt="分布式项目过滤器" /></p>
+<h2 id="distributed-aggregates-分布式聚合"><a class="header" href="#distributed-aggregates-分布式聚合">Distributed Aggregates 分布式聚合</a></h2>
+<p>让我们使用在上一章节执行并行查询中所用的 SQL 查询示例，并观察聚合查询在分布式计划中的含义。</p>
+<pre><code class="language-SQL">SELECT passenger_count, MAX(max_fare)
+FROM tripdata
+GROUP BY passenger_count
+</code></pre>
+<p>我们可以在 <code>tripdata</code> 表的所有分区上并行执行此查询，集群中的每个执行处理器负责这些分区的一部分。但是，我们需要将所有的结果聚合数据合并到单个节点上，才能应用最终的聚合查询，以便获得一个没有重复的分组键（本例中为 <code>passenger_count</code>） 的结果集合。下面是一个可能代表这种情况的逻辑查询计划。注意，新的 <code>Exchange</code> 操作符表示执行器之间的数据交换。交换的物理计划可以通过将中间结果写入共享存储来实现，或者可以通过将数据直接以流的形式传输到其它执行器来实现。</p>
+<pre><code class="language-SQL">HashAggregate: groupBy=[passenger_count], aggr=[MAX(max_fare)]
+  Exchange:
+    HashAggregate: groupBy=[passenger_count], aggr=[MAX(max_fare)]
+      Scan: tripdata.parquet
+</code></pre>
+<p>下图展示了如何在分布式环境中执行此查询：</p>
+<p><img src="https://howqueryengineswork.com/resources/distributed_agg.png" alt="分布式聚合" /></p>
+<h2 id="distributed-joins-分布式连接"><a class="header" href="#distributed-joins-分布式连接">Distributed Joins 分布式连接</a></h2>
+<p>连接通常是在分布式环境中执行的最昂贵的操作。这样说的原因是，我们需要确保在组织数据时，两个输入关系都根据连接键进行了分区。例如，如果我们把 <code>customer</code> 表连接到 <code>order</code> 表，其中连接的条件是 <code>customer.id = order.customer_id</code>，则两个表中针对特定客户的所有行必须由同一执行器处理。要实现这一点，我们必须受限对连接键上的两个表进行重新分区，并将分区写入磁盘。一旦完成，我们就可以对每个分区并行地执行连接了。结果数据仍将按连接键进行分区。这种特殊的连接算法称为分区哈希连接。重新划分数据地过程称为执行 &quot;shuffle&quot;。</p>
+<p><img src="https://howqueryengineswork.com/resources/distributed_join.png" alt="分布式连接" /></p>
+<h2 id="distirbuted-query-scheduling-分布式查询调度"><a class="header" href="#distirbuted-query-scheduling-分布式查询调度">Distirbuted Query Scheduling 分布式查询调度</a></h2>
+<p>分布式查询计划与进程内查询计划有本质上地不同，因为我们不能仅仅构建一个运算符树并开始执行它们。现在的查询需要跨执行器进行协调，这意味着我们现在开始需要构建一个调度器。</p>
+<p>在高层次上，分布式查询调度器的概念并不复杂。调度器需要检查整个查询，并将其分解为可以单独主席那个的阶段（通常跨执行器并行执行），然后根据集群中的可用资源调度执行这些阶段。一旦每个查询阶段完成，就可以安排任何后续的依赖性查询阶段。直到所有查询都被执行完成前都重复这一过程。</p>
+<p>调度器还可以负责管理集群中的计算资源，以便可以根据需要启动额外的执行器来处理查询负载。</p>
+<p>在本章节的其余部分，我们将讨论以下主题，即 Ballista 和该项目中实现的设计。</p>
+<ul>
+<li>生成分布式查询计划</li>
+<li>序列化查询计划并于执行器交换</li>
+<li>在执行器之间交换中间结果</li>
+<li>优化分布式查询</li>
+</ul>
+<h2 id="producing-a-distributed-query-plan-生成分布式查询计划"><a class="header" href="#producing-a-distributed-query-plan-生成分布式查询计划">Producing a Distributed Query Plan 生成分布式查询计划</a></h2>
+<p>正如我们在前例中看到的那样，一些运算符可以在输入分区上并行运行，而另一些运算符需要对数据进行重新分区。分区中的这些变动是规划分布式查询的关键。计划中的分区变更有时称为管道中断，分区时的这些变更定义了查询阶段之间的边界。</p>
+<p>现在我们将使用下面的 SQL 查询来了解这个过程具体是如何工作的：</p>
+<pre><code class="language-SQL">SELECT customer.id, sum(order.amount) as total_amount
+FROM customer JOIN order ON customer.id = order.customer_id
+GROUP BY customer.id
+</code></pre>
+<p>该查询的（非分布式）物理计划如下所示：</p>
+<pre><code class="language-SQL">Projection: #customer.id, #total_amount
+  HashAggregate: groupBy=[customer.id], aggr=[MAX(max_fare) AS total_amount]
+    Join: condition=[customer.id = order.customer_id]
+      Scan: customer
+      Scan: order
+</code></pre>
+<p>假设 customer 和 order 表还没有根据 customer id 进行分区，我们将需要调度执行前两个查询阶段，以对该数据进行重新分区。这两个查询阶段可以并行。</p>
+<pre><code class="language-SQL">Query Stage #1: repartition=[customer.id]
+  Scan: customer
+Query Stage #2: repartition=[order.customer_id]
+  Scan: order
+</code></pre>
+<p>接下来，我们可以调度连接，它将在两个输入的各个分区并行运行。连接之后的下一个运算符是聚合，它被分成两部分：并行前的聚合，然后是需要变成单个输入分区的最终聚合。我们可以在与连接相同的查询阶段执行此聚合的并行部分。</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../14-parallel_query_execution/index.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../14-parallel_query_execution/index.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>

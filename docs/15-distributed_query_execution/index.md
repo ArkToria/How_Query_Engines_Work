@@ -87,4 +87,118 @@ Query Stage #2: repartition=[order.customer_id]
   Scan: order
 ```
 
-接下来，我们可以调度连接，它将在两个输入的各个分区并行运行。连接之后的下一个运算符是聚合，它被分成两部分：并行前的聚合，然后是需要变成单个输入分区的最终聚合。我们可以在与连接相同的查询阶段执行此聚合的并行部分。
+接下来，我们可以调度连接，它将在两个输入的各个分区并行运行。连接之后的下一个运算符是聚合，它被分成两部分：并行前的聚合，然后是需要变成单个输入分区的最终聚合。我们可以在与连接相同的查询阶段执行此聚合的并行部分，因为第一个聚合不关心数据如何分区。然后来到第三个查询阶段，让我们现在开始调度执行。此查询阶段的输出仍然按客户 id 进行分区。
+
+```kotlin
+Query Stage #3: repartition=[]
+  HashAggregate: groupBy=[customer.id], aggr=[MAX(max_fare) AS total_amount]
+    Join: condition=[customer.id = order.customer_id]
+      Query Stage #1
+      Query Stage #2
+```
+
+最后一个查询阶段执行聚合，从前一个阶段的所有分区中读取数据。
+
+```kotlin
+Query Stage #4:
+  Projection: #customer.id, #total_amount
+    HashAggregate: groupBy=[customer.id], aggr=[MAX(max_fare) AS total_amount]
+      QueryStage #3
+```
+
+稍作回顾，下面是完整的分布式查询计划，其中显示了当需要在管道操作之间重新分区或交换数据时引入的查询阶段。
+
+```kotlin
+Query Stage #4:
+  Projection: #customer.id, #total_amount
+    HashAggregate: groupBy=[customer.id], aggr=[MAX(max_fare) AS total_amount]
+      Query Stage #3: repartition=[]
+        HashAggregate: groupBy=[customer.id], aggr=[MAX(max_fare) AS total_amount]
+          Join: condition=[customer.id = order.customer_id]
+            Query Stage #1: repartition=[customer.id]
+              Scan: customer
+            Query Stage #2: repartition=[order.customer_id]
+              Scan: order
+```
+
+## Serializing a Query Plan 序列化查询计划
+
+查询调度器需要将整个查询计划的片段发送给执行程序执行。
+
+有许多选项可以用于序列化查询计划，以便在进程之间传递查询计划。许多查询引擎选择使用编程语言原生支持序列化的策略。如果不需要跨编程语言交换查询计划，那这无疑是一个合适的选择，而且这通常是最简单的实现机制。
+
+然而，使用于编程语言无关的序列化格式是有好处的。Ballista 使用 Google 的 Protocol Buffers 格式来定义查询计划。该项目通常缩写为 "protobuf"。
+
+下面是在 Ballista 的 protobuf 中定义的部分查询计划。
+
+完整的源代码可以在 Ballista 的 github 仓库中找到。
+
+> 译者注：由于 Ballista 现已移归到 Apache-Arrow 项目中，因此新的地址改为
+> [https://github.com/apache/arrow-datafusion/blob/main/datafusion/proto/proto/datafusion.proto](https://github.com/apache/arrow-datafusion/blob/main/datafusion/proto/proto/datafusion.proto)
+
+```proto
+message LogicalPlanNode {
+  LogicalPlanNode input = 1;
+  FileNode file = 10;
+  ProjectionNode projection = 20;
+  SelectionNode selection = 21;
+  LimitNode limit = 22;
+  AggregateNode aggregate = 23;
+}
+
+message FileNode {
+  string filename = 1;
+  Schema schema = 2;
+  repeated string projection = 3;
+}
+
+message ProjectionNode {
+  repeated LogicalExprNode expr = 1;
+}
+
+message SelectionNode {
+  LogicalExprNode expr = 2;
+}
+
+message AggregateNode {
+  repeated LogicalExprNode group_expr = 1;
+  repeated LogicalExprNode aggr_expr = 2;
+}
+
+message LimitNode {
+  uint32 limit = 1;
+}
+```
+
+Protobuf 项目提供了用于生成特定语言源代码的工具 ([protoc](https://github.com/protocolbuffers/protobuf/releases/))，以序列化和反序列化数据。
+
+## Serializing Data 序列化数据
+
+数据在客户端和执行器之间以及执行器与执行器之间进行流传输的时候也必须进行序列化。
+
+Apache Arrow 提供了一种 IPC（程间通讯）格式，用于在进程之间交换数据。由于 Arrow 提供了标准化的内存布局，因此可以直接在内存和输入/输出设备（磁盘、网络等）之间传输原始字节，而没有常规的与序列化相关的开销。这实际上是一个 zero copy 操作，因为数据不必从其所在内存中的格式，转换为单独的序列化格式。
+
+但是，关于数据的元数据，例如 schema 模式（列名和数据类型）确实需要使用 Google Flatbuffers 进行编码。 此元数据很小，并且通常每个结果集或每个批处理序列化一次，因此开销很小。
+
+使用 Apache Arrow 的另一个优点是，它在不同编程语言之间提供了非常有效的数据交换。
+
+IPC 定义了数据编码格式，但是没有定义交换机制。例如，Arrow IPC 可以通过 JNI 将数据从 JVM 语言传输到 C 或者 Rust。
+
+## Choosing a Protocol 选择协议
+
+既然我们已经为查询计划和数据选择了序列化格式，下一个问题是如何在分布式进程之间交换这些数据。
+
+Apache Arrow 为此提供了一个 Flight 协议。Flight 是一种新的通用 C/S 框架，用于简化大型数据集在网络接口上高性能传输实现。
+
+Arrow Flight 库提供了一个开发框架，用于实现可以发送和接收数据流的服务。Flight 服务端支持了几种基本类型的请求：
+
+- **Handshake**: 一个简单的请求，以确定客户端是否被授权，在某些情况下，也可以建立一个实现定义的会话令牌，以供未来的请求使用
+- **ListFlights**: 返回可用的数据流列表
+- **GetSchema**: 返回数据流的模式
+- **GetFlightInfo**: 返回关注的数据集的 “访问计划”，可能需要使用多个数据流。此请求可以接收包含特定应用程序参数的自定义序列化命令
+- **DoGet**: 将数据流发送到客户端
+- **DoPut**: 从客户端接收数据流
+- **DoAction**: 执行特定于实现的操作并返回任意结果，即通用函数调用
+- **ListActions**: 返回可用操作类型的列表
+
+例如，`GetFlightInfo` 方法可用于编译查询计划并返回接收结果所需的信息，然后再每个执行器上调用 `DoGet` 以开始接收来自查询的结果。

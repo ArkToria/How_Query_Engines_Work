@@ -67,7 +67,7 @@ fun `gteq doubles`() {
 }
 ```
 
-## Integration Testing
+## Integration Testing 集成测试
 
 单元测试就绪后，下一步是编写集成测试，执行多个运算符和表达式组成的查询，并断言它们按预期产生输出。
 

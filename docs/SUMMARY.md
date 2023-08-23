@@ -31,3 +31,9 @@
 - [执行并行查询](./14-parallel_query_execution/index.md)
 
 - [执行分布式查询](./15-distributed_query_execution/index.md)
+
+- [测试](./16-testing/index.md)
+
+- [基准测试](./17-benchmarks/index.md)
+
+- [更多资源](./18-further_resources/index.md)
